@@ -26,10 +26,10 @@ int main()
   struct char_print_parameters thread2_param;
 
   thread1_param.character='x';
-  thread1_param.count=1000000;
+  thread1_param.count=10000;
 
   thread2_param.character='o';
-  thread2_param.count=1000000;
+  thread2_param.count=10000;
   pthread_create(&thread1_id,NULL,&char_print,&thread1_param);
   pthread_create(&thread2_id,NULL,&char_print,&thread2_param);
 

@@ -1,11 +1,18 @@
 #IDIR=-I/usr/lib/g++-include
 
-cobj=thread_create2.o thread-create.o zombie.o sigusr1.o fork-exec.o main.o create-file.o getopt_long.o arglist.o temp_file.o openfile.o fork.o 
+f_thread_obj=thread-create.o thread_create2.o
+
+f_thread_tg=thread-create thread_create2
+
+cobj=zombie.o sigusr1.o fork-exec.o main.o create-file.o getopt_long.o arglist.o temp_file.o openfile.o fork.o 
+
 #c++obj=reciprocal.o recip.o 
-ctg=thread_create2 thread-create sigusr1 zombie fork-exec create-file getopt_long arglist temp_file openfile fork
+
+ctg=sigusr1 zombie fork-exec create-file getopt_long arglist temp_file openfile fork
+
 #c++tg=recip 
 
-all:	$(ctg) $(cobj)
+all:	$(ctg) $(cobj) $(f_thread_tg) $(f_thread_tg) 
 #all:	$(ctg) $(c++tg) $(cobj) $(c++obj) reciprocal 
 
 $(cobj):	%.o:	%.c
@@ -22,7 +29,12 @@ $(cobj):	%.o:	%.c
  	
 $(ctg):	%:	%.o
 	-gcc $(CFLAGS)  $< -o $@
-	
+
+$(f_thread_obj):	%.o:	%.c
+	-gcc $(CFLAGS) -o $@ -c $<
+
+$(f_thread_tg):	%:	%.o
+	-gcc $(CFLAGS) -lpthread -o $@ $<
 clean:	
-	-rm *.o $(ctg)
+	-rm *.o $(ctg) $(f_thread_tg)
 #	-rm *.o reciprocal $(ctg) $(c++tg)

@@ -4,7 +4,7 @@
 void* print_x(void* noneed)
 {
   int i;
-  for (i=0;i<1000000;i++)
+  for (i=0;i<100000;i++)
     fputc('x',stderr);
 
   return NULL;
