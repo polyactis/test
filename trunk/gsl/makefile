@@ -1,5 +1,5 @@
 gsl_lib		= -lgsl -lgslcblas
-gsl_cxx_targets	= gsl_example
+gsl_cxx_targets	= gsl_example gsl_eigen
 cxx_flags	= -O2 -Wall
 cxx_compiler	= g++
 gsl_c_targets	= gsl_histo_example
