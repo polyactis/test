@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <gsl/gsl_math.h>
 #include <gsl/gsl_eigen.h>
+#include <iostream>
 
 int
 main (void)
@@ -18,8 +19,11 @@ main (void)
 
 	gsl_eigen_symmv_workspace * w =
 		gsl_eigen_symmv_alloc (4);
-
+	//02-23-05 access the dimension of the matrix of a matrixview
+	std::cout<<"dimension of matrix : "<<m.matrix.size1 <<std::endl;
 	gsl_eigen_symmv (&m.matrix, eval, evec, w);
+	//02-23-05 access the dimension of a matrix pointer.
+	std::cout<<"dimension of matrix evec: "<<evec->size1 <<std::endl;
 
 	gsl_eigen_symmv_free (w);
 
