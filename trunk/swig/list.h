@@ -3,7 +3,10 @@ using namespace std;
 
 class List {
 	public:
-		List();
+		List(char* m_name);
 		~List();
+		void print_name();
 		int  length;
+		char* my_name;
+
 };

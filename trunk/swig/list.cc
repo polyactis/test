@@ -1,11 +1,19 @@
 #include "list.h"
 
-List::List()
+List::List(char* m_name)
 {
-	cout<<"fda"<<endl;
+	my_name = m_name;
+	cout<<my_name<<endl;
+	cout<<"Here I start"<<endl;
 }
 
 List::~List()
 {
+	cout<<my_name<<endl;
 	cout<<"finished"<<endl;
+}
+
+void List::print_name()
+{
+	cout<<my_name<<endl;
 }
