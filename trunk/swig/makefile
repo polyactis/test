@@ -27,7 +27,7 @@ all:	$(CTARGETS) $(CPPTARGETS)
 example_wrap.c:	%_wrap.c:	%.i
 	swig -python $<
 
-$(CPPWRAP):	%_wrap.cc:	%.i
+$(CPPWRAP):	%_wrap.cc:	%.i %.cc
 	swig -c++ -python -o $@ $<
 
 %_wrap.o:	%_wrap.c
