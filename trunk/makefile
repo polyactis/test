@@ -11,11 +11,15 @@ c++tg=recip
 all:	$(ctg) $(c++tg) $(f_thread_tg)  reciprocal subdirs
 
 
-subdirs:	$(SUBDIRS)
-	$(MAKE) -C $<
+subdirs:
+	for dir in $(SUBDIRS); do \
+		$(MAKE) -C $$dir; \
+	done
 	
-clean_subdirs:	$(SUBDIRS)
-	$(MAKE) -C $< clean
+clean_subdirs:
+	for dir in $(SUBDIRS); do \
+		$(MAKE) -C $$dir clean; \
+	done
 	
 .c.o:
 	-gcc $(CFLAGS) -c $< -o $@
