@@ -4,11 +4,11 @@ f_thread_obj=primes.o thread-create.o thread_create2.o
 
 f_thread_tg=primes thread-create thread_create2
 
-cobj=listdir.o dir.o zombie.o sigusr1.o fork-exec.o main.o create-file.o getopt_long.o arglist.o temp_file.o openfile.o fork.o 
+cobj=inet.o socket-inet.o socket-server.o socket-client.o shm.o listdir.o dir.o zombie.o sigusr1.o fork-exec.o main.o create-file.o getopt_long.o arglist.o temp_file.o openfile.o fork.o 
 
 #c++obj=reciprocal.o recip.o 
 
-ctg=listdir dir sigusr1 zombie fork-exec create-file getopt_long arglist temp_file openfile fork
+ctg=inet socket-inet socket-server socket-client shm listdir dir sigusr1 zombie fork-exec create-file getopt_long arglist temp_file openfile fork
 
 #c++tg=recip 
 
