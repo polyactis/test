@@ -4,6 +4,10 @@
 *Idea is simple, get the second minimum eigen vector. Parition the vertices based on the sign
 *of the each value in the vector.
 *
+*02-24-05
+*	it's hard to use vector<int> in the iterator_property_map.
+*
+*
 */
 
 #include <boost/config.hpp>
@@ -26,7 +30,9 @@
 #include <gsl/gsl_math.h>		//for gsl_matrix, gsl_vector stuff
 #include <gsl/gsl_eigen.h>		//for gsl_eigen stuff
 
+
 using namespace boost;
+using namespace std;
 
 typedef subgraph<adjacency_list<vecS, vecS, undirectedS,
 	property<vertex_name_t, int>, property<edge_index_t, int> > > Graph;
@@ -64,7 +70,8 @@ class test
 		double connectivity_cutoff;
 		//store the final results
 		std::vector<Graph> good_clusters;
-
+		//the weight map
+		iterator_property_map<int*, EdgeIndexMap, int, int&> weight_pa;
 };
 
 test::test(double connectivity, int which_eigen_vector, int cluster_size)
@@ -101,7 +108,9 @@ void test::self_init_graph(Graph &graph)
 	std::cout<<std::endl;
 	Edge edge_array[] = {Edge(A,B), Edge(A,D), Edge(C,A), Edge(D,C),  Edge(C,E), Edge(B,D), Edge(D,E),Edge(B,C)};
 	const int num_edges = sizeof(edge_array)/sizeof(edge_array[0]);
-	int weight_array[] = {6,7,6,8,9,10,6,7,9,10,11,2,3,};
+	int weight_array[num_edges];
+	for(int i=0;i<num_edges;i++)
+		weight_array[i]=10-i;
 	//add one by one
 	for (std::size_t j = 0; j < num_edges; ++j) {
 		graph_traits<Graph>::edge_descriptor e; bool inserted;
@@ -109,8 +118,8 @@ void test::self_init_graph(Graph &graph)
 	}
 	//setup an exterior property_map for edge weights
 	EdgeIndexMap edge_id = boost::get(boost::edge_index, graph);
-	boost::iterator_property_map<int*, EdgeIndexMap, int, int&>
-	weight_pa(weight_array, edge_id);
+
+	weight_pa = iterator_property_map<int*, EdgeIndexMap, int, int&>(weight_array, edge_id);
 	
 	#if defined(DEBUG)
 	//print the edge weights
@@ -162,6 +171,7 @@ void test::init_graph_from_file(std::ifstream &datafile, Graph &graph)
 			weight_array.push_back(atoi(edge_weight.c_str()));
 	}
 }
+
 
 gsl_matrix* test::graph2gsl_matrix(Graph &graph)
 {
@@ -288,7 +298,7 @@ void test::clustering(Graph &graph)
 		std::vector<Graph> vector_sub_subgraph = subgraph_components(vector_subgraph[i], graph, component, no_of_components);
 		
 		std::vector<Graph>::iterator g_iterator;
-		std::cout<<"No of components of "<<i<<" is: "<<no_of_components<<std::endl;
+		std::cout<<"No. of components in subgraph "<<i<<" is: "<<no_of_components<<std::endl;
 		for(g_iterator=vector_sub_subgraph.begin();g_iterator!=vector_sub_subgraph.end();++g_iterator)
 		{
 			if(num_vertices(*g_iterator)>=min_cluster_size)
@@ -380,6 +390,7 @@ void test::output()
 	for(g_iterator=good_clusters.begin();g_iterator!=good_clusters.end();++g_iterator)
 		walk_edges(*g_iterator, g);
 }
+
 
 int main(int argc, char* argv[])
 {
