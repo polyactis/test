@@ -1,9 +1,9 @@
 gsl_lib		= -lgsl -lgslcblas
 gsl_cxx_targets	= gsl_example
-cxx_flags	= -O2
+cxx_flags	= -O2 -Wall
 cxx_compiler	= g++
 gsl_c_targets	= gsl_histo_example
-c_flags		= -O2
+c_flags		= -O2 -Wall
 c_compiler	= gcc
 
 
