@@ -52,4 +52,4 @@ $(CTARGETS):	_%.so:	%.o %_wrap.o
 
 
 clean:
-	-rm  -f *.o *.pyc *.so *_wrap.c *_wrap.cc
+	-rm  -f *.o *.pyc *.py *.so *_wrap.c *_wrap.cc
