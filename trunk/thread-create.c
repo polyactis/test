@@ -4,7 +4,7 @@
 void* print_x(void* noneed)
 {
   int i;
-  for (i=0;i<100000;i++)
+  for (i=0;i<1000;i++)
     fputc('x',stderr);
 
   return NULL;
@@ -20,7 +20,7 @@ int main()
 
   pthread_join(thread_id,NULL);
   
-  for(i=0;i<100;i++)
+  for(i=0;i<1000;i++)
     fputc('0',stderr);
 
   return 0;
