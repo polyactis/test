@@ -1,12 +1,20 @@
 #include <iostream>
 #include <ostream>
 #include <vector>
-#include <hash_map.h>
+#include <ext/hash_map> 
 #include <gsl/gsl_sf_bessel.h>
 #include <gsl/gsl_math.h>
 #include <gsl/gsl_randist.h>
 #include <gsl/gsl_cdf.h>
 using namespace std;
+using namespace __gnu_cxx;
+
+/*
+ *
+ * 02-15-05, #include<hash_map.h> gets backward warning, deprecated blahblah;
+ * but #include<ext/hash_map> requires using namespace __gnu_cxx.
+ * 
+ */
 
 template<class T> struct print: public unary_function<T, void>
 {
@@ -18,6 +26,8 @@ template<class T> struct print: public unary_function<T, void>
 
 int main(void)
 {
+	//declare everything in a namespace
+	//using namespace __gnu_cxx;
 	//call a function
 	double x = 5.0;
 	double y = gsl_sf_bessel_J0(x);
@@ -69,7 +79,7 @@ int main(void)
 	hash_map<const char*, float > gene_label2index;
 	
 	gene_label2index["YAR006W"] = 0.001;
-	//hash_map<const char*, float>::iterator result = gene_label2index.find("YAR006W");
+	hash_map<const char*, float>::iterator result = gene_label2index.find("YAR006W");
 	float value = gene_label2index["YAR006X"];
 	if(gene_label2index["YAR006W"])
 		cout<<"YES"<<endl;
