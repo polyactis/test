@@ -1,8 +1,8 @@
 #IDIR=-I/usr/lib/g++-include
 
-f_thread_obj=thread-create.o thread_create2.o
+f_thread_obj=primes.o thread-create.o thread_create2.o
 
-f_thread_tg=thread-create thread_create2
+f_thread_tg=primes thread-create thread_create2
 
 cobj=zombie.o sigusr1.o fork-exec.o main.o create-file.o getopt_long.o arglist.o temp_file.o openfile.o fork.o 
 
