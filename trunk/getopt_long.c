@@ -44,19 +44,19 @@ int main(int argc,char* argv[])
 		break;
 	  case '?':
 		print_usage(stderr,-1);
-	  case '-1':
+	  case -1:
 		break;
 		
 	  default:
 		
-		/*abort();*/
+		abort();
 	  }
 	}while(next_option!=-1);
 
 	if(verbose){
 		int i;
-		for(i=optind;i<argc;i++);
-		printf("Argument: %s \n",argv[i]);
+		for(i=optind;i<argc;i++)
+			printf("Argument: %s \n",argv[i]);
 	}
 
 	return 0;
