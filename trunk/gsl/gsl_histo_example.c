@@ -1,45 +1,42 @@
 #include <stdio.h>
-#include <gsl/gsl_rng.h>
-#include <gsl/gsl_histogram2d.h>
+#include <stdlib.h>
+#include <gsl/gsl_histogram.h>
 
 int
-main (void)
+main (int argc, char **argv)
 {
-  const gsl_rng_type * T;
-  gsl_rng * r;
+  double a, b;
+  size_t n;
 
-  gsl_histogram2d * h = gsl_histogram2d_alloc (10, 10);
+  if (argc != 4)
+    {
+      printf ("Usage: gsl-histogram xmin xmax n\n"
+              "Computes a histogram of the data "
+              "on stdin using n bins from xmin "
+              "to xmax\n");
+      exit (0);
+    }
 
-  gsl_histogram2d_set_ranges_uniform (h, 
-                                      0.0, 1.0,
-                                      0.0, 1.0);
-
-  gsl_histogram2d_accumulate (h, 0.3, 0.3, 1);
-  gsl_histogram2d_accumulate (h, 0.8, 0.1, 5);
-  gsl_histogram2d_accumulate (h, 0.7, 0.9, 0.5);
-
-  gsl_rng_env_setup ();
-  
-  T = gsl_rng_default;
-  r = gsl_rng_alloc (T);
+  a = atof (argv[1]);
+  b = atof (argv[2]);
+  n = atoi (argv[3]);
 
   {
-    int i;
-    gsl_histogram2d_pdf * p 
-      = gsl_histogram2d_pdf_alloc (h->nx, h->ny);
-    
-    gsl_histogram2d_pdf_init (p, h);
+    double x;
 
-    for (i = 0; i < 1000; i++) {
-      double x, y;
-      double u = gsl_rng_uniform (r);
-      double v = gsl_rng_uniform (r);
-       
-      gsl_histogram2d_pdf_sample (p, u, v, &x, &y);
-      
-      printf ("%g %g\n", x, y);
-    }
+    gsl_histogram * h = gsl_histogram_alloc (n);
+            
+    gsl_histogram_set_ranges_uniform (h, a, b);
+
+    while (fscanf (stdin, "%lg", &x) == 1)
+      {
+        gsl_histogram_increment (h, x);
+      }
+
+    gsl_histogram_fprintf (stdout, h, "%g", "%g");
+
+    gsl_histogram_free (h);
   }
   
- return 0;
+  exit (0);
 }
