@@ -41,6 +41,10 @@ int main(void)
 	//chi-squared
 	double q_c = gsl_cdf_chisq_Q(2, 10);
 	cout <<q_c<<endl;
+
+	//sqrt 
+	double sq = sqrt(2.0);
+	cout <<"Square root of 2.0 is "<<sq<<endl;
 	return 0;
 	
 }
