@@ -3,6 +3,7 @@
 #include <vector>
 #include <bitset>
 #include <cmath>
+#include <string>
 #define GENE_CUT_OFF 8
 #define JK_CUT_OFF 7
 #define COR_CUT_OFF 0.6
@@ -22,7 +23,6 @@ class graph_construct
 	vector<vf> cor_array;
 	vector<bit_vector> mask_vector;
 	vector<string> gene_labels_vector;
-	char* graph_name;
 	int no_of_genes;
 	int no_of_cols;
 	int no_of_valids;
@@ -44,4 +44,5 @@ class graph_construct
 		bit_vector bv_or(bit_vector bv1, bit_vector bv2);
 		int bv_count(bit_vector bv);
 		void split(string line);
+		string graph_name;
 };
