@@ -22,7 +22,7 @@ char* read_temp_file(temp_file_handle temp_file,size_t* length)
 	lseek(fd,0,SEEK_SET);
 	read(fd,length,sizeof(*length));
 	buffer=(char*) malloc(*length);
-	read(fd,buffer,length);
+	read(fd,buffer,*length);
 	close(fd);
 	return buffer;
 
