@@ -1,4 +1,4 @@
-SUBDIRS = swig
+SUBDIRS = swig gsl
 .PHONY: clean_subdirs subdirs $(SUBDIRS)
 
 GCOV=-ftest-coverage -fprofile-arcs -fbranch-probabilities
