@@ -1,12 +1,17 @@
-#!/usr/bin/env python
+#!/usr/bin/env mpipython
 """
 
 03-19-05
 	modeled after fork-exec.c in the test repositary
-
+04-08-05
+	add some MPI stuff and test fork-exec under MPI
 """
 
 import os, sys
+
+from Scientific import MPI
+communicator = MPI.world.duplicate()
+print "I'm node %s"%communicator.rank
 
 print "Right before process duplicating..."
 
