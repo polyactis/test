@@ -42,6 +42,16 @@ boost::python::tuple World::return_keys(dict dic, int length)
 		int g2 = extract<int>(k_list[i][1]);
 		boost::python::tuple tup = boost::python::make_tuple(g1,g2);
 		std::string s =extract<std::string>(dic[tup]);
+		//04-12-05	testing the conversion of data type between python and c++
+		//'extract' works by some registered converters. i.e. python string to c++ string,
+		//but not from python string to c++ int.
+		if (s=="NA")
+			std::cout<<"NA encounted"<<std::endl;
+		if (s=="123")
+		{
+			int t = atoi(s.c_str());
+			std::cout<<"integer encounted "<<t<<std::endl;
+		}
 		std::cout<<s<<std::endl;
 	}
 	dc1[make_tuple(1,2)]=1;
