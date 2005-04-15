@@ -12,5 +12,5 @@ instance = hello.World("Hi.")
 dc={1:'NA',2:'123'}
 from Numeric import *
 ar = array([[1,2],[3,4]])
-br = hello.exercise(ar)
+br = instance.exercise(ar)
 result = instance.return_keys(dc,2,ar)
