@@ -8,9 +8,12 @@
 #include <iostream>
 #include <boost/python.hpp>
 #include <boost/graph/subgraph.hpp>	//for boost::subgraph
+#include <vector>	//for vector
 
 using namespace boost::python;
 //using namespace boost;		//02-24-05 namespace conflict
+
+
 char const* greet()
 {
 	return "hello, world";
@@ -22,11 +25,12 @@ class World
 	World(std::string msg): msg(msg) {} // added constructor
 	void set(std::string msg) { this->msg = msg; }
 	std::string greet() { return msg; }
-	boost::python::tuple return_keys(dict dic, int length);
+	boost::python::tuple return_keys(dict dic, int length, object data);
+	object exercise(object ar);
 	std::string msg;
 };
 
-boost::python::tuple World::return_keys(dict dic, int length)
+boost::python::tuple World::return_keys(dict dic, int length, object data)
 {
 	dict dc1;
 	dict dc2;
@@ -59,10 +63,42 @@ boost::python::tuple World::return_keys(dict dic, int length)
 	list new_list;
 	new_list.append(dc1);
 	new_list.append(dc2);
+	
+	//04-15-05	testing the numeric object
+	std::vector<float> data_vector;
+	tuple shape = extract<tuple>(data.attr("shape"));
+	int numRows = extract<int>(shape[0]);
+	int numCols = extract<int>(shape[1]);
+	std::cout<<"numRows: "<<numRows<<std::endl;
+	std::cout<<"numCols: "<<numCols<<std::endl;
+	
+	
 	return make_tuple(new_list);
 	
 }
 
+
+//04-15-05	take a python Numeric or numarray /array as parameter, and return an array
+object World::exercise(object ar)
+{
+	numeric::array br = extract<numeric::array>(ar);
+	std::cout<<"elements of an array: "<<extract<int>(ar[0][0])<<std::endl;
+	
+	tuple shape = extract<tuple>(ar.attr("shape"));
+	int numRows = extract<int>(shape[0]);
+	int numCols = extract<int>(shape[1]);
+	std::cout<<"numRows: "<<numRows<<std::endl;
+	std::cout<<"numCols: "<<numCols<<std::endl;
+	
+	return numeric::array(
+        make_tuple(
+            make_tuple(1,2,3)
+          , make_tuple(4,5,6)
+          , make_tuple(7,8,9)
+            )
+        );
+	
+}
 
 void f(str name)
 {
@@ -77,5 +113,8 @@ BOOST_PYTHON_MODULE(hello)
 		.def("greet", &World::greet)
 		.def("set", &World::set)
 		.def("return_keys", &World::return_keys)
+		.def("exercise", &World::exercise)
 	;
+	//04-15-05 function offered to select Numeric or numarray
+	def("set_module_and_type", &numeric::array::set_module_and_type);
 }
