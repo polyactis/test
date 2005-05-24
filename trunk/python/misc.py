@@ -439,7 +439,8 @@ def haiyan_cor_vector_file2graph_modeling_input(cor_fname, sig_fname, output_fna
 05-17-05
 	return the set of vertices covered by a mcl table
 """
-def return_mcl_table_vertex_set(mcl_table, schema):
+def return_mcl_table_vertex_set(input_fname, schema):
+	mcl_table = "mcl_%s"%input_fname
 	hostname = 'zhoudb'
 	dbname = 'graphdb'
 	from codense.common import db_connect
@@ -654,6 +655,111 @@ class efetch_handler(handler.ContentHandler):
 		if name == "GBSeq_comment":
 			self.GBSeq_comment = 0
 
+"""
+05-20-05
+"""
+def get_total_gene_id2no(hostname='zhoudb', dbname='graphdb', schema='graph', organism=None):
+	from codense.common import db_connect
+	import psycopg, sys
+	conn, curs = db_connect(hostname, dbname, schema)
+	sys.stderr.write("Getting gene_no2gene_id...")
+	gene_id2no = {}
+	if schema:
+		curs.execute("set search_path to %s"%schema)
+	curs.execute("select gene_id, gene_no from gene_id_to_no where organism='%s'"%organism)
+	rows = curs.fetchall()
+	for row in rows:
+		gene_id2no[row[0]] = row[1]
+	sys.stderr.write("Done\n")
+	return gene_id2no
+
+def gene_set_from_summary_graph(summary_gfile, min_support):
+	import csv,sys
+	from sets import Set
+	summary_gf = open(summary_gfile,'r')
+	reader = csv.reader(summary_gf, delimiter=' ')
+	gene_no_set = Set()
+	for row in reader:
+		if row[0]=='e':
+			gene_no1 = int(row[1])
+			gene_no2 = int(row[2])
+			support = int(row[3])
+			if support >= min_support:
+				gene_no_set.add(gene_no1)
+				gene_no_set.add(gene_no2)
+	del reader
+	return gene_no_set
+
+
+def no_of_edges_from_summary_graph_given_gene_set(summary_gfile, min_support, gene_set):
+	import csv,sys
+	from sets import Set
+	summary_gf = open(summary_gfile,'r')
+	reader = csv.reader(summary_gf, delimiter=' ')
+	no_of_edges = 0
+	for row in reader:
+		if row[0]=='e':
+			gene_no1 = int(row[1])
+			gene_no2 = int(row[2])
+			support = int(row[3])
+			if support >= min_support and (gene_no1 in gene_set) and (gene_no2 in gene_set) :
+				no_of_edges += 1
+	del reader
+	return no_of_edges
+
+def output_graph_edge_from_matrix(matrix_file):
+	import csv, sys
+	reader = csv.reader(open(matrix_file,'r'), delimiter='\t')
+	i=0
+	graph_dict = {}
+	for row in reader:
+		row = map(int, row)
+		for j in range(len(row)):
+			if row[j]>0:
+				if i<j:
+					graph_dict[(i,j)]=row[j]
+		i+=1
+	for edge in graph_dict:
+		print edge, graph_dict[edge]
+	edge_list = graph_dict.keys()
+	edge_list.sort()
+	print edge_list
+
+"""
+05-24-05
+	remove a series of tables based on the input_fname
+"""
+def remove_tables(input_fname, hostname='zhoudb', dbname='graphdb', schema='sc_new_38', commit=0):
+	splat_result_table = "splat_%s"%input_fname
+	mcl_result_table = "mcl_%s"%input_fname
+	cluster_stat_table = "cluster_%s"%input_fname
+	p_gene_table = "p_gene_%s_e5"%input_fname
+	gene_p_table = "gene_p_%s_e5_p01"%input_fname
+	edge_input_fname = '%se'%input_fname
+	e_splat_result_table = "splat_%s"%edge_input_fname
+	e_mcl_result_table = "mcl_%s"%edge_input_fname
+	e_cluster_stat_table = "cluster_%s"%edge_input_fname
+	e_p_gene_table = "p_gene_%s_e5"%edge_input_fname
+	e_gene_p_table = "gene_p_%s_e5_p01"%edge_input_fname
+	
+	old_cluster_stat_table = "cluster_stat_%s"%input_fname
+	old_splat_result_table = "splat_result_%s"%input_fname
+	old_mcl_result_table = "mcl_result_%s"%input_fname
+	table_list = [splat_result_table, mcl_result_table, cluster_stat_table, p_gene_table, gene_p_table,\
+		e_splat_result_table, e_mcl_result_table,e_cluster_stat_table, e_p_gene_table, e_gene_p_table, \
+		old_cluster_stat_table, old_splat_result_table, old_mcl_result_table]
+	from codense.common import db_connect
+	import psycopg, sys
+	conn, curs = db_connect(hostname, dbname, schema)
+	for table in table_list:
+		try:
+			sys.stderr.write("Deleting %s...\n"%table)
+			curs.execute("drop table %s"%table)
+			if commit:
+				curs.execute("end")
+		except:
+			print "Deleting %s error: %s"%(table, repr(sys.exc_info()[0]))
+			conn, curs = db_connect(hostname, dbname, schema)
 
 if __name__ == '__main__':
 	import sys
