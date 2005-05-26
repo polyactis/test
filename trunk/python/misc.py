@@ -806,6 +806,80 @@ def gene_no2cluster_id_list_from_gene_p_table(input_fname, hostname='zhoudb', db
 		gene_no2cluster_id_list[gene_no].append(cluster_id)
 	return gene_no2cluster_id_list
 
+
+"""
+05-25-05
+	read in a graph(haiyan's edge format) and return a matrix and an edge_list
+"""
+def read_in_graph(input_fname):
+	import csv
+	edge_list = []
+	no_of_vertices = 0
+	vertex_dict = {}
+	reader = csv.reader(open(input_fname,'r'),delimiter='\t')
+	for row in reader:
+		vertex1 = int(row[0])
+		vertex2 = int(row[1])
+		if vertex1 not in vertex_dict:
+			vertex_dict[vertex1] = no_of_vertices
+			no_of_vertices += 1
+		if vertex2 not in vertex_dict:
+			vertex_dict[vertex2] = no_of_vertices
+			no_of_vertices += 1
+		edge_list.append([vertex_dict[vertex1], vertex_dict[vertex2]])
+	from Numeric import zeros
+	graph_matrix = zeros((no_of_vertices, no_of_vertices))
+	for edge in edge_list:
+		graph_matrix[edge[0], edge[1]] = 1
+		graph_matrix[edge[1], edge[0]] = 1
+	del reader
+	return (graph_matrix, edge_list)
+
+"""
+05-25-05
+	transform an adjacency matrix to laplacian matrix
+"""
+def adjacency2laplacian(adjacency_matrix):
+	from Numeric import zeros
+	laplacian_matrix = zeros(adjacency_matrix.shape)
+	for i in range(adjacency_matrix.shape[0]):
+		degree = sum(adjacency_matrix[i, :])
+		laplacian_matrix[i,i] = degree
+		for j in range(adjacency_matrix.shape[1]):
+			if adjacency_matrix[i,j] != 0:
+				laplacian_matrix[i,j] = -1
+	return laplacian_matrix
+
+"""
+05-25-05
+	plot the graph in the planar form(see Dan Spielman's online tutorial)
+"""
+def plot_platnar_graph(laplacian_matrix, edge_list):
+	from MLab import eig
+	from rpy import r
+	eigen_result = eig(laplacian_matrix)
+	#eigen_result[0] is an array of eigenvalues
+	#eigen_result[1] is an array of corresponding eigenvectors
+	eigen_vector_2nd = eigen_result[1][argsort(eigen_result[0])[1]]	#the second minimum, but must be non-zero, the graph is connected
+	eigen_vector_3rd = eigen_result[1][argsort(eigen_result[0])[2]]
+	r.plot(list(eigen_vector_2nd),list(eigen_vector_3rd),xlab='',ylab='')
+	for edge in edge_list:
+		x_list = [eigen_vector_2nd[edge[0]], eigen_vector_2nd[edge[1]]]
+		y_list = [eigen_vector_3rd[edge[0]], eigen_vector_3rd[edge[1]]]
+		r.lines(x_list,y_list)
+	
+"""
+05-25-05
+	normalize a graph matrix, and I-(the normalized graph matrix) = laplacian matrix(normalized)
+"""
+def return_normalized_laplacian_matrix(graph_matrix):
+	from Numeric import Float, dot, identity, diagonal
+	graph_matrix = graph_matrix.astype(Float)
+	laplacian_matrix = adjacency2laplacian(graph_matrix)
+	D_1_2 = identity(laplacian_matrix.shape[0])*pow(diagonal(laplacian_matrix),-0.5)
+	normalized_laplacian_matrix = identity(graph_matrix.shape[0])-dot(dot(D_1_2,graph_matrix),D_1_2)
+	return normalized_laplacian_matrix
+
 if __name__ == '__main__':
 	import sys
 	haiyan_cor_vector_file2graph_modeling_input(sys.argv[1], sys.argv[2], sys.argv[3], int(sys.argv[4]))
