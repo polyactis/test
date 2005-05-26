@@ -570,6 +570,24 @@ def cluster_id_set_from_p_gene_table(input_fname, hostname='zhoudb', dbname='gra
 		set_to_return.add(gene_no)
 	return set_to_return
 
+def cluster_id_set_from_gene_p_table(input_fname, hostname='zhoudb', dbname='graphdb', schema='sc_new_38'):
+	from sets import Set
+	set_to_return = Set()
+	p_gene_table = "p_gene_%s_e5"%input_fname
+	gene_p_table = "gene_p_%s_e5_p01"%input_fname
+	from codense.common import db_connect
+	import psycopg
+	conn, curs = db_connect(hostname, dbname, schema)
+	curs.execute("select p.mcl_id from %s p, %s g where p.p_gene_id=g.p_gene_id"%\
+		(p_gene_table, gene_p_table))
+	rows = curs.fetchall()
+	for row in rows:
+		gene_no = row[0]
+		set_to_return.add(gene_no)
+	return set_to_return
+
+
+
 
 def cluster_size_list_from_p_gene_table(input_fname, hostname='zhoudb', dbname='graphdb', schema='sc_new_38'):
 	from sets import Set
@@ -612,12 +630,16 @@ def cluster_id_size_list_from_p_gene_table(input_fname, hostname='zhoudb', dbnam
 			ls_to_return.append(row)
 	return ls_to_return
 """
-05-18-05
+05-24-05
+	not finished
 """
 
-def small_summary_graph(summary_gfile, cluster_edge_file, output_fname):
+def return_edge_set_of_summary_graph(summary_gfile, cluster_edge_file, output_fname):
 	import csv,sys
 	summary_gf = open(summary_gfile,'r')
+	from sets import Set
+	edge_set = Set()
+	
 	cluster_edge_f = open(cluster_edge_file, 'r')
 	of = open(output_fname,'w')
 	edge_list = cluster_edge_f.readline()
@@ -760,6 +782,29 @@ def remove_tables(input_fname, hostname='zhoudb', dbname='graphdb', schema='sc_n
 		except:
 			print "Deleting %s error: %s"%(table, repr(sys.exc_info()[0]))
 			conn, curs = db_connect(hostname, dbname, schema)
+
+"""
+05-24-05
+	one more restriction, the prediction must be correct
+"""
+def gene_no2cluster_id_list_from_gene_p_table(input_fname, hostname='zhoudb', dbname='graphdb', schema='sc_new_38'):
+	from sets import Set
+	gene_no2cluster_id_list = {}
+	p_gene_table = "p_gene_%s_e5"%input_fname
+	gene_p_table = "gene_p_%s_e5_p01"%input_fname
+	from codense.common import db_connect
+	import psycopg
+	conn, curs = db_connect(hostname, dbname, schema)
+	curs.execute("select p.gene_no,p.mcl_id from %s p, %s g where p.p_gene_id=g.p_gene_id and p.is_correct=1"%\
+		(p_gene_table, gene_p_table))
+	rows = curs.fetchall()
+	for row in rows:
+		gene_no = row[0]
+		cluster_id = row[1]
+		if gene_no not in gene_no2cluster_id_list:
+			gene_no2cluster_id_list[gene_no] = []
+		gene_no2cluster_id_list[gene_no].append(cluster_id)
+	return gene_no2cluster_id_list
 
 if __name__ == '__main__':
 	import sys
