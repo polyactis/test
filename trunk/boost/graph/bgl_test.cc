@@ -270,7 +270,7 @@ void test::clustering(Graph &graph)
 		gsl_vector_fprintf (stdout,evec_i, "%g");
 	#endif
 	int i;
-	std::cout<<"Second minimum eigenvector: "<<std::endl;
+	std::cout<<"The "<<eigen_vector_no<<"th minimum eigenvector: "<<std::endl;
 	for(i=0;i<evec_i->size;++i)
 		std::cout<<gsl_vector_get(evec_i, i)<<"\t";
 	std::cout<<std::endl;
@@ -334,19 +334,26 @@ void test::run()
 
 void test::walk_vertices(Graph &graph)
 {
-	boost::graph_traits<Graph>::vertex_descriptor 
-	s = vertex(0, graph);
+	boost::property_map<Graph, vertex_index_t>::type vertex_id = get(vertex_index, graph);
 	vertex_name_type vertexname=get(vertex_name, graph);
-	std::cout<<"the out edges for vertex "<<get(vertexname, s)<<": ";
+	
+	int vertex_source = 0;
+	boost::graph_traits<Graph>::vertex_descriptor 
+	s = vertex(vertex_source, graph);
+	std::cout<<"the out edges for vertex "<<get(vertexname, s)<<" is: ";
 	boost::graph_traits<Graph>::out_edge_iterator e, e_end;
 	for(tie(e, e_end) = out_edges(s,graph); e!=e_end; ++e)
-		std::cout<<"("<<source(*e, graph)<<target(*e,graph)<<")";
+		std::cout<<"("<<get(vertexname, source(*e, graph))<<","<<get(vertexname, target(*e,graph))<<")";
 	std::cout<<std::endl;
+	
+	boost::graph_traits<Graph>::adjacency_iterator a_it, a_it_end;
+	std::cout<<"the adjacent vertices of vertex "<<get(vertex_id, s)<<" is: ";	
+	for(tie(a_it, a_it_end)=adjacent_vertices(s, graph); a_it!=a_it_end; ++a_it)
+		std::cout<<vertex_id[*a_it]<<" ";
+	std::cout<<std::endl;
+	
 	std::cout<<"Number of vertices: "<<num_vertices(graph)<<std::endl;
-	
-	boost::property_map<Graph, vertex_index_t>::type
-	vertex_id = get(vertex_index, graph);
-	
+
 	std::cout << "vertices(g) = ";
 	typedef graph_traits<Graph>::vertex_iterator vertex_iter;
 	std::pair<vertex_iter, vertex_iter> vp;
