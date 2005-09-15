@@ -96,7 +96,7 @@ def output_transposed_matrix(filename, m1):
 	del writer
 
 
-def db_connect(psycopg, hostname, dbname, schema=None):
+def db_connect(hostname, dbname, schema=None):
 	"""
 	02-28-05
 		establish database connection, return (conn, curs).
@@ -151,14 +151,21 @@ def get_go_no2depth(curs, schema=None, table='go'):
 
 
 class get_edge_data:
-	def __init__(self):
+	"""
+	06-03-05
+		see annot/MpiTightClust.py for updated version.
+	"""
+	def __init__(self, hostname='zhoudb', dbname='graphdb', schema=None):
+		self.hostname = hostname
+		self.dbname = dbname
+		self.schema = schema
 		self.gene_no2go_no = {}
 		self.go_no2edge_matrix_data = {}
 	
 	def run(self):
 		import psycopg
 		import sys
-		conn,curs = db_connect(psycopg, "zhoudb","graphdb","sc_54_6661")
+		conn,curs = db_connect(psycopg, self.hostname, self.dbname,self.schema)
 		
 		self.gene_no2go_no = self.prepare_gene_no2go_no(curs)
 		self.get_function_edge_matrix_data(curs)
@@ -181,12 +188,12 @@ class get_edge_data:
 		counter = 0
 		while rows:
 			for row in rows:
-				self._get_function_edge_matrix_data(row)	
+				self._get_function_edge_matrix_data(row)
 				counter +=1
 			sys.stderr.write('%s%s'%('\x08'*20, counter))
 			curs.execute("fetch 5000 from crs")
 			rows = curs.fetchall()
-		sys.stderr.write("Done\n")		
+		sys.stderr.write("Done\n")
 
 
 	def _get_function_edge_matrix_data(self, row):
@@ -597,8 +604,8 @@ def cluster_size_list_from_p_gene_table(input_fname, hostname='zhoudb', dbname='
 	mcl_table = 'mcl_%s'%input_fname
 	from codense.common import db_connect
 	import psycopg
-	conn, curs = db_connect(hostname, dbname, schema)
-	curs.execute("select m.mcl_id,array_upper(m.vertex_set,1) from %s m, %s p where p.mcl_id=m.mcl_id"%\
+	conn, curs = db_connect(ho65stname, dbname, schema)
+	curs.execute("select distinct m.mcl_id,array_upper(m.vertex_set,1) from %s m, %s p where p.mcl_id=m.mcl_id"%\
 		(mcl_table, p_gene_table))
 	rows = curs.fetchall()
 	ls_to_return = []
@@ -609,6 +616,25 @@ def cluster_size_list_from_p_gene_table(input_fname, hostname='zhoudb', dbname='
 			ls_to_return.append(row[1])
 	return ls_to_return
 
+def cluster_size_list_from_gene_p_table(input_fname, hostname='zhoudb', dbname='graphdb', schema='sc_new_38'):
+	from sets import Set
+	set_to_return = Set()
+	p_gene_table = "p_gene_%s_e5"%input_fname
+	gene_p_table = "gene_p_%s_e5_p01"%input_fname
+	mcl_table = 'mcl_%s'%input_fname
+	from codense.common import db_connect
+	import psycopg
+	conn, curs = db_connect(hostname, dbname, schema)
+	curs.execute("select m.mcl_id,array_upper(m.vertex_set,1) from %s m, %s p, %s g where p.mcl_id=m.mcl_id and p.p_gene_id=g.p_gene_id"%\
+		(mcl_table, p_gene_table, gene_p_table))
+	rows = curs.fetchall()
+	ls_to_return = []
+	for row in rows:
+		mcl_id = row[0]
+		if mcl_id not in set_to_return:
+			set_to_return.add(mcl_id)
+			ls_to_return.append(row[1])
+	return ls_to_return
 
 def cluster_id_size_list_from_p_gene_table(input_fname, hostname='zhoudb', dbname='graphdb', schema='sc_new_38'):
 	from sets import Set
@@ -699,16 +725,16 @@ def gene_set_from_summary_graph(summary_gfile, min_support):
 	import csv,sys
 	from sets import Set
 	summary_gf = open(summary_gfile,'r')
-	reader = csv.reader(summary_gf, delimiter=' ')
+	reader = csv.reader(summary_gf, delimiter='\t')
 	gene_no_set = Set()
 	for row in reader:
 		if row[0]=='e':
 			gene_no1 = int(row[1])
 			gene_no2 = int(row[2])
-			support = int(row[3])
-			if support >= min_support:
-				gene_no_set.add(gene_no1)
-				gene_no_set.add(gene_no2)
+			#support = int(row[3])
+			#if support >= min_support:
+			gene_no_set.add(gene_no1)
+			gene_no_set.add(gene_no2)
 	del reader
 	return gene_no_set
 
@@ -785,7 +811,7 @@ def remove_tables(input_fname, hostname='zhoudb', dbname='graphdb', schema='sc_n
 
 """
 05-24-05
-	one more restriction, the prediction must be correct
+
 """
 def gene_no2cluster_id_list_from_gene_p_table(input_fname, hostname='zhoudb', dbname='graphdb', schema='sc_new_38'):
 	from sets import Set
@@ -795,7 +821,7 @@ def gene_no2cluster_id_list_from_gene_p_table(input_fname, hostname='zhoudb', db
 	from codense.common import db_connect
 	import psycopg
 	conn, curs = db_connect(hostname, dbname, schema)
-	curs.execute("select p.gene_no,p.mcl_id from %s p, %s g where p.p_gene_id=g.p_gene_id and p.is_correct=1"%\
+	curs.execute("select p.gene_no,p.mcl_id from %s p, %s g where p.p_gene_id=g.p_gene_id"%\
 		(p_gene_table, gene_p_table))
 	rows = curs.fetchall()
 	for row in rows:
@@ -806,6 +832,88 @@ def gene_no2cluster_id_list_from_gene_p_table(input_fname, hostname='zhoudb', db
 		gene_no2cluster_id_list[gene_no].append(cluster_id)
 	return gene_no2cluster_id_list
 
+"""
+06-21-05
+"""
+def gene_no2go_id_set_from_gene_p_given_gene_set(input_fname, gene_set, hostname='zhoudb', dbname='graphdb', schema='sc_new_38'):
+	from sets import Set
+	gene_no2go_id_list = {}
+	p_gene_table = "p_gene_%s_e5"%input_fname
+	gene_p_table = "gene_p_%s_e5_p01"%input_fname
+	from codense.common import db_connect
+	import psycopg
+	conn, curs = db_connect(hostname, dbname, schema)
+	curs.execute("select p.gene_no,go.go_id from %s p, go, %s g where p.p_gene_id=g.p_gene_id and go.go_no=p.go_no"%\
+		(p_gene_table, gene_p_table))
+	rows = curs.fetchall()
+	for row in rows:
+		gene_no = row[0]
+		go_id = row[1]
+		if gene_no in gene_set:
+			if gene_no not in gene_no2go_id_list:
+				gene_no2go_id_list[gene_no] = Set()
+			gene_no2go_id_list[gene_no].add(go_id)
+	return gene_no2go_id_list
+
+def gene_no_go_id_pair_from_gene_p_given_gene_set(input_fname, gene_set, hostname='zhoudb', dbname='graphdb', schema='sc_new_38'):
+	from sets import Set
+	gene_no2go_id_set = Set()
+	p_gene_table = "p_gene_%s_e5"%input_fname
+	gene_p_table = "gene_p_%s_e5_p01"%input_fname
+	from codense.common import db_connect
+	import psycopg
+	conn, curs = db_connect(hostname, dbname, schema)
+	curs.execute("select p.gene_no,go.go_id from %s p, %s g, go where p.p_gene_id=g.p_gene_id and go.go_no =p.go_no"%\
+		(p_gene_table, gene_p_table))
+	rows = curs.fetchall()
+	for row in rows:
+		gene_no = row[0]
+		go_id = row[1]
+		if gene_no in gene_set:
+			gene_no2go_id_set.add((gene_no,go_id))
+	return gene_no2go_id_set
+	
+"""
+06-26-05
+"""
+def go_id_set_from_gene_p_table(input_fname, hostname='zhoudb', dbname='graphdb', schema='sc_new_38'):
+	from sets import Set
+	go_id_set = Set()
+	p_gene_table = "p_gene_%s_e5"%input_fname
+	gene_p_table = "gene_p_%s_e5_p01"%input_fname
+	from codense.common import db_connect
+	import psycopg
+	conn, curs = db_connect(hostname, dbname, schema)
+	curs.execute("select p.gene_no,go.go_id from %s p, %s g, go where p.p_gene_id=g.p_gene_id and go.go_no =p.go_no"%\
+		(p_gene_table, gene_p_table))
+	rows = curs.fetchall()
+	for row in rows:
+		gene_no = row[0]
+		go_id = row[1]
+		go_id_set.add(go_id)
+	return go_id_set
+
+"""
+06-27-05
+"""
+def gene_no2go_id_set_from_gene_p_table(input_fname, hostname='zhoudb', dbname='graphdb', schema='sc_new_38'):
+	from sets import Set
+	gene_no2go_id_set = {}
+	p_gene_table = "p_gene_%s_e5"%input_fname
+	gene_p_table = "gene_p_%s_e5_p01"%input_fname
+	from codense.common import db_connect
+	import psycopg
+	conn, curs = db_connect(hostname, dbname, schema)
+	curs.execute("select p.gene_no,go.go_id from %s p, go, %s g where p.p_gene_id=g.p_gene_id and go.go_no=p.go_no"%\
+		(p_gene_table, gene_p_table))
+	rows = curs.fetchall()
+	for row in rows:
+		gene_no = row[0]
+		go_id = row[1]
+		if gene_no not in gene_no2go_id_set:
+			gene_no2go_id_set[gene_no] = Set()
+		gene_no2go_id_set[gene_no].add(go_id)
+	return gene_no2go_id_set
 
 """
 05-25-05
@@ -880,6 +988,516 @@ def return_normalized_laplacian_matrix(graph_matrix):
 	normalized_laplacian_matrix = identity(graph_matrix.shape[0])-dot(dot(D_1_2,graph_matrix),D_1_2)
 	return normalized_laplacian_matrix
 
+"""
+05-27-05
+	read in the 2nd-order graph constructed by netmine2nd given --out2nd
+	and output it in a similar way to check_netmine2nd.py
+	
+	Please refer the same function in check_netmine2nd.py. This one is outdated.
+"""
+def read_2nd_order_graph(input_fname, output_fname):
+	import csv
+	reader = csv.reader(open(input_fname,'r'), delimiter='\t')
+	writer = csv.writer(open(output_fname, 'w'), delimiter='\t')
+	for row in reader:
+		edge_list_2nd_order_graph = row[3]
+		edge_list_2nd_order_graph = edge_list_2nd_order_graph[1:-2].split(';')
+		for edge in edge_list_2nd_order_graph:
+			edge = edge.split('-')
+			edge.sort()
+			writer.writerow(edge)
+	del reader,writer
+
+"""
+06-07-05
+	return the set of distinct datasets in all the results of tightClust.
+"""
+
+def return_distinct_datasets_set(input_fname):
+	import csv
+	from sets import Set
+	ds_set = Set()
+	reader = csv.reader(open(input_fname,'r'),delimiter='\t')
+	for row in reader:
+		ds_set |= Set(row)
+	del reader
+	return ds_set
+
+"""
+06-10-05
+"""
+def return_ds_set_list(input_fname):
+	import csv
+	from sets import Set
+	ds_set_list = []
+	reader = csv.reader(open(input_fname,'r'),delimiter=',')
+	for row in reader:
+		row = map(int, row)
+		ds_set_list.append( Set(row))
+	del reader
+	return ds_set_list
+"""
+06-16-05
+	read a graph(graph_modeling output format, or even simpler (without 'e')) and return
+	the graph_dict, edge is in tuple form(smaller_id, bigger_id)
+"""
+def graph_dict_from_graph(input_fname):
+	import csv
+	graph_dict = {}
+	reader = csv.reader(open(input_fname,'r'),delimiter='\t')
+	reader.next()
+	for row in reader:
+		vertex1 = int(row[0])
+		vertex2 = int(row[1])
+		weight = row[2]
+		if vertex1 < vertex2:
+			edge_tuple = (vertex1,vertex2)
+		else:
+			edge_tuple = (vertex2, vertex1)
+		graph_dict[edge_tuple] = weight
+	del reader
+	return graph_dict
+"""
+graph_modeling format (with 'e')
+"""
+def graph_dict_from_graph2(input_fname):
+	import csv
+	graph_dict = {}
+	reader = csv.reader(open(input_fname,'r'),delimiter='\t')
+	reader.next()
+	for row in reader:
+		vertex1 = int(row[1])
+		vertex2 = int(row[2])
+		weight = row[3]
+		if vertex1 < vertex2:
+			edge_tuple = (vertex1,vertex2)
+		else:
+			edge_tuple = (vertex2, vertex1)
+		graph_dict[edge_tuple] = weight
+	del reader
+	return graph_dict
+
+"""
+06-23-05
+	output 500 lines of a specified correlation
+"""
+def output_corTable(outfname, cor):
+	import csv
+	writer = csv.writer(open(outfname,'w'), delimiter='\t')
+	for i in range(500):
+		writer.writerow([i+1, cor])
+	del writer
+"""
+06-27-05
+"""
+def return_gene_no_set_with_this_prediction(gene_no2go_id_set, go_id):
+	from sets import Set
+	gene_no_set = Set()
+	for gene_no,go_id_set in gene_no2go_id_set.iteritems():
+		if go_id in go_id_set:
+			gene_no_set.add(gene_no)
+	return gene_no_set
+
+def return_gene_no_set_with_prediction_set(gene_no2go_id_set, go_id_set_given):
+	from sets import Set
+	gene_no_set = Set()
+	for gene_no,go_id_set in gene_no2go_id_set.iteritems():
+		intersection_set = go_id_set_given&go_id_set
+		if len(intersection_set)>0:
+			gene_no_set.add(gene_no)
+	return gene_no_set
+
+
+"""
+07-06-05
+"""
+def recurrence_list_from_p_gene_table(input_fname, hostname='zhoudb', dbname='graphdb', schema='sc_new_38'):
+	from sets import Set
+	set_to_return = Set()
+	p_gene_table = "p_gene_%s_e5"%input_fname
+	gene_p_table = "gene_p_%s_e5_p01"%input_fname
+	mcl_table = 'mcl_%s'%input_fname
+	from codense.common import db_connect
+	import psycopg
+	conn, curs = db_connect(hostname, dbname, schema)
+	curs.execute("select distinct m.mcl_id,p.recurrence_cut_off from %s m, %s p where p.mcl_id=m.mcl_id"%\
+		(mcl_table, p_gene_table))
+	rows = curs.fetchall()
+	ls_to_return = []
+	for row in rows:
+		mcl_id = row[0]
+		if mcl_id not in set_to_return:
+			set_to_return.add(mcl_id)
+			ls_to_return.append(row[1])
+	return ls_to_return
+
+
+"""
+07-27-05
+"""
+def subgraph_from_summary_graph_given_geneset(summary_gfile, gene_set, min_support):
+	from graphlib import Graph
+	import csv,sys
+	from sets import Set
+	graph = Graph.Graph()
+	summary_gf = open(summary_gfile,'r')
+	reader = csv.reader(summary_gf, delimiter=' ')
+	for row in reader:
+		if row[0]=='e':
+			gene_no1 = int(row[1])
+			gene_no2 = int(row[2])
+			support = int(row[3])
+			if support >= min_support and gene_no1 in gene_set and gene_no2 in gene_set:
+				graph.add_node(gene_no1)
+				graph.add_node(gene_no2)
+				graph.add_edge(gene_no1, gene_no2, support)
+	del reader
+	return graph
+
+"""
+07-27-05
+"""
+def recurrence_list_from_gene_p_table(input_fname, hostname='zhoudb', dbname='graphdb', schema='sc_new_38'):
+	from sets import Set
+	set_to_return = Set()
+	p_gene_table = "p_gene_%s_e5"%input_fname
+	gene_p_table = "gene_p_%s_e5_a60"%input_fname
+	mcl_table = 'mcl_%s'%input_fname
+	from codense.common import db_connect
+	import psycopg
+	conn, curs = db_connect(hostname, dbname, schema)
+	curs.execute("select m.mcl_id,p.recurrence_cut_off from %s m, %s p, %s g where p.mcl_id=m.mcl_id and p.p_gene_id=g.p_gene_id"%\
+		(mcl_table, p_gene_table, gene_p_table))
+	rows = curs.fetchall()
+	ls_to_return = []
+	for row in rows:
+		mcl_id = row[0]
+		if mcl_id not in set_to_return:
+			set_to_return.add(mcl_id)
+			ls_to_return.append(row[1])
+	return ls_to_return
+
+"""
+07-27-05
+"""
+def connectivity_list_from_gene_p_table(input_fname, hostname='zhoudb', dbname='graphdb', schema='sc_new_38'):
+	from sets import Set
+	set_to_return = Set()
+	splat_table = 'splat_%s'%input_fname
+	p_gene_table = "p_gene_%s_e5"%input_fname
+	gene_p_table = "gene_p_%s_e5_a60"%input_fname
+	mcl_table = 'mcl_%s'%input_fname
+	from codense.common import db_connect
+	import psycopg
+	conn, curs = db_connect(hostname, dbname, schema)
+	curs.execute("select m.mcl_id,s.connectivity from %s m, %s p, %s g, %s s \
+		where p.mcl_id=m.mcl_id and p.p_gene_id=g.p_gene_id and m.splat_id=s.splat_id"%\
+		(mcl_table, p_gene_table, gene_p_table, splat_table))
+	rows = curs.fetchall()
+	ls_to_return = []
+	for row in rows:
+		mcl_id = row[0]
+		if mcl_id not in set_to_return:
+			set_to_return.add(mcl_id)
+			ls_to_return.append(row[1])
+	return ls_to_return
+
+"""
+07-27-05
+"""
+def rec_con_list_from_gene_p_table(input_fname, hostname='zhoudb', dbname='graphdb', schema='sc_new_38'):
+	from sets import Set
+	set_to_return = Set()
+	splat_table = 'splat_%s'%input_fname
+	p_gene_table = "p_gene_%s_e5"%input_fname
+	gene_p_table = "gene_p_%s_e5_a60"%input_fname
+	mcl_table = 'mcl_%s'%input_fname
+	from codense.common import db_connect
+	import psycopg
+	conn, curs = db_connect(hostname, dbname, schema)
+	curs.execute("select m.mcl_id,p.recurrence_cut_off,s.connectivity from %s m, %s p, %s g, %s s \
+		where p.mcl_id=m.mcl_id and p.p_gene_id=g.p_gene_id and m.splat_id=s.splat_id"%\
+		(mcl_table, p_gene_table, gene_p_table, splat_table))
+	rows = curs.fetchall()
+	ls_to_return = []
+	for row in rows:
+		mcl_id = row[0]
+		if mcl_id not in set_to_return:
+			set_to_return.add(mcl_id)
+			ls_to_return.append([row[1],row[2]])
+	return ls_to_return
+
+"""
+07-28-05
+"""
+def plot_rec_con_list(rec_con_list):
+	rec_list = [row[0] for row in rec_con_list]
+	con_list = [row[1] for row in rec_con_list]
+	from rpy import r
+	r.plot(rec_list,con_list,main='con~rec',xlab='rec',ylab='con')
+
+def hist_plot_rec_con_list(rec_con_list, which_column=0):
+	rec_list = [row[which_column] for row in rec_con_list]
+	from rpy import r
+	r.hist(rec_list,main='histogram',xlab='something',ylab='freq')
+
+"""
+07-29-05
+"""
+def output_edge_data_for_fim(edge_table='edge_cor_vector', min_support=3, hostname='zhoudb', dbname='graphdb', schema='sc_new_38', debug=0):
+	#connect to the database
+	import sys, psycopg, os
+	sys.path += [os.path.expanduser('~/script/annot/bin')]
+	from codense.common import db_connect
+	conn, curs = db_connect(hostname, dbname, schema)
+	
+	#get the number of graphs in total
+	curs.execute("select array_upper(sig_vector,1) from %s limit 1"%(edge_table))
+	rows = curs.fetchall()
+	no_of_files = int(rows[0][0])
+	
+	#create fname_list
+	fname_list = []
+	for i in range(no_of_files):
+		fname_list.append('/tmp/graph%s'%i)
+	
+	#open a number of files
+	fhandler_list = []
+	for i in range(no_of_files):
+		fhandler_list.append(open(fname_list[i], 'w'))
+	
+	sys.stderr.write("Getting edge matrix for all functions...\n")
+	curs.execute("DECLARE crs CURSOR FOR select edge_id,sig_vector \
+		from %s"%(edge_table))
+	curs.execute("fetch 5000 from crs")
+	rows = curs.fetchall()
+	counter = 0
+	while rows:
+		for row in rows:
+			edge_id = row[0]
+			sig_vector = row[1][1:-1].split(',')
+			sig_vector = map(int, sig_vector)
+			if sum(sig_vector)>=min_support:
+				for i in range(len(sig_vector)):
+					if sig_vector[i]==1:
+						fhandler_list[i].write('\t%s'%edge_id)
+			counter +=1
+		sys.stderr.write('%s%s'%('\x08'*20, counter))
+		if debug:
+			break
+		curs.execute("fetch 5000 from crs")
+		rows = curs.fetchall()
+	
+	#append the newline
+	for i in range(no_of_files):
+		fhandler_list[i].write('\n')
+		fhandler_list[i].close()
+	
+	os.system('rm /tmp/graph.fim_input')
+	for i in range(len(fname_list)):
+		os.system('cat %s >>/tmp/graph.fim_input'%fname_list[i])
+	
+	sys.stderr.write("Done\n")
+
+"""
+08-04-05
+"""
+def output_edge_data_fim_edge_oriented(edge_table='edge_cor_vector', min_support=3, max_support=200, hostname='zhoudb', dbname='graphdb', schema='sc_new_38', debug=0):
+	#connect to the database
+	import sys, psycopg, os, csv
+	sys.path += [os.path.expanduser('~/script/annot/bin')]
+	from codense.common import db_connect
+	conn, curs = db_connect(hostname, dbname, schema)
+	
+	fname = "/tmp/%s.fim.input"%schema
+	writer = csv.writer(open(fname,'w'),delimiter='\t')
+	
+	sys.stderr.write("Getting edge matrix for all functions...\n")
+	curs.execute("DECLARE crs CURSOR FOR select edge_id,sig_vector \
+		from %s"%(edge_table))
+	curs.execute("fetch 5000 from crs")
+	rows = curs.fetchall()
+	counter = 0
+	while rows:
+		for row in rows:
+			edge_id = row[0]
+			sig_vector = row[1][1:-1].split(',')
+			sig_vector = map(int, sig_vector)
+			
+			if sum(sig_vector)>=min_support and sum(sig_vector)<=max_support:
+				new_row = []
+				for i in range(len(sig_vector)):
+					if sig_vector[i]==1:
+						new_row.append(i+1)
+				writer.writerow(new_row)
+			counter +=1
+		sys.stderr.write('%s%s'%('\x08'*20, counter))
+		if debug:
+			break
+		curs.execute("fetch 5000 from crs")
+		rows = curs.fetchall()
+	
+	sys.stderr.write("Done\n")
+
+"""
+07-14-05
+"""
+def return_dc_from_file(filename):
+	import csv
+	reader = csv.reader(file(filename), delimiter='\t')
+	dc = {}
+	for row in reader:
+		dc[row[0]] = int(row[1])
+	return dc
+
+"""
+07-14-05
+"""
+def key_dif(dc1, dc2, max_no_cutoff, ratio_cutoff):
+	from sets import Set
+	s = Set(dc1.keys())|Set(dc2.keys())
+	ls = []
+	tuple_ls = []
+	for item in s:
+		no1 = dc1.get(item)
+		no2 = dc2. get(item)
+		if no1 == None:
+			no1 = 0
+		if no2 == None:
+			no2 = 0
+		no_diff = no1-no2
+		max_no = max(no1, no2)
+		if max_no>= max_no_cutoff and no_diff/float(max_no) >= ratio_cutoff:
+			ls.append(item)
+			tuple_ls.append((item,no1, no2))
+	return ls, tuple_ls
+
+"""
+08-16-05
+"""
+def gene2go_no_from_gene_p_table(input_fname, hostname='zhoudb', dbname='graphdb', schema='sc_new_38'):
+	gene2go_no = {}
+	splat_table = 'splat_%s'%input_fname
+	p_gene_table = "p_gene_%s_e5"%input_fname
+	gene_p_table = "gene_p_%s_e5_a60"%input_fname
+	mcl_table = 'mcl_%s'%input_fname
+	from codense.common import db_connect
+	import psycopg
+	conn, curs = db_connect(hostname, dbname, schema)
+	curs.execute("select distinct p.gene_no,p.go_no from %s p, %s g \
+		where p.p_gene_id=g.p_gene_id"%\
+		(p_gene_table, gene_p_table))
+	rows = curs.fetchall()
+	for row in rows:
+		gene_no= row[0]
+		go_no = row[1]
+		if gene_no not in gene2go_no:
+			gene2go_no[gene_no] = []
+		gene2go_no[gene_no].append(go_no)
+	return gene2go_no
+
+def gene2go_no_from_gene_p_table2(input_fname, hostname='zhoudb', dbname='graphdb', schema='sc_new_38'):
+	gene2go_no = {}
+	splat_table = 'splat_%s'%input_fname
+	p_gene_table = "p_gene_%s_e5"%input_fname
+	gene_p_table = "gene_p_%s_e5_a60"%input_fname
+	mcl_table = 'mcl_%s'%input_fname
+	from codense.common import db_connect
+	import psycopg
+	conn, curs = db_connect(hostname, dbname, schema)
+	curs.execute("select distinct p.gene_no,p.go_no from %s p, %s g \
+		where p.p_gene_id=g.p_gene_id_src"%\
+		(p_gene_table, gene_p_table))
+	rows = curs.fetchall()
+	for row in rows:
+		gene_no= row[0]
+		go_no = row[1]
+		if gene_no not in gene2go_no:
+			gene2go_no[gene_no] = []
+		gene2go_no[gene_no].append(go_no)
+	return gene2go_no	
+"""
+08-16-05
+"""
+def hist_plot_pleiotropy(gene2go_no, no_of_breaks):
+	go_list = gene2go_no.values()
+	freq_list = map(len, go_list)
+	from rpy import r
+	r.hist(freq_list,main='histogram',xlab='something',ylab='freq', breaks=no_of_breaks)
+	print "total predictions :",sum(freq_list)
+
+def count_genes(gene2go_no):
+	freq2counter = {}
+	for gene_no, go_no_list in gene2go_no.iteritems():
+		frequency = len(go_no_list)
+		if frequency not in freq2counter:
+			freq2counter[frequency] = 0
+		freq2counter[frequency] += 1
+	return freq2counter
+
+def hist_plot_pleiotropy_prob(gene2go_no, no_of_breaks):
+	go_list = gene2go_no.values()
+	freq_list = map(len, go_list)
+	from rpy import r
+	r.hist(freq_list,main='histogram',xlab='something',ylab='freq',breaks=no_of_breaks)
+	print "total predictions :",sum(freq_list)
+	return freq_list
+
+"""
+08-24-05
+	to test whether a Numeric array is passed as a pointer or copied
+"""
+def fill_edge_matrix(edge_matrix):
+	for i in range(edge_matrix.shape[0]):
+		for j in range(edge_matrix.shape[1]):
+			edge_matrix[i][j] = i*j
+
+def append_list(ls):
+	for i in range(10):
+		ls.append([i]*10)
+
+
+"""
+08-28-05
+	get a certain column data into a list, and draw a histogram
+"""
+def draw_one_column(inputfile, which_column, no_of_breaks, top_value=None):
+	import csv
+	reader = csv.reader(open(inputfile, 'r'), delimiter='\t')
+	data = []
+	for row in reader:
+		value = float(row[which_column])
+		if top_value:
+			if value>=top_value:
+				continue
+		data.append(value)
+	del reader
+	from rpy import r
+	r.hist(data, xlab='value',ylab='freq',main='hist', breaks=no_of_breaks)
+	return data
+
+"""
+09-02-05
+	a function to stop betweenness_centrality_clustering()
+"""
+def done(m_centrality, edge_desc, g):
+	connectivity = g.num_edges()*2.0/(g.num_vertices()*(g.num_vertices()-1)/2)
+	eim=g.get_edge_index_map()
+	print "The edge is %s"%eim[edge_desc]
+	print "its centrality is",m_centrality
+	print "connectivity is ",connectivity
+	vim = g.get_vertex_int_map("component")
+	n_of_c = bgl.connected_components(g, vim)
+	print "number of connected components is",n_of_c
+	if n_of_c >=2:
+		return True
+	elif connectivity>=0.7:
+		return True
+	else:
+		return False
+
 if __name__ == '__main__':
 	import sys
-	haiyan_cor_vector_file2graph_modeling_input(sys.argv[1], sys.argv[2], sys.argv[3], int(sys.argv[4]))
+	instance = get_edge_data('zhoudb','graphdb', sys.argv[1])
+	instance.run()
+	#haiyan_cor_vector_file2graph_modeling_input(sys.argv[1], sys.argv[2], sys.argv[3], int(sys.argv[4]))
