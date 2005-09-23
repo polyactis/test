@@ -1549,7 +1549,64 @@ def write_gene_incidence_matrix(dir, output_dir, hostname='zhoudb', dbname='grap
 				of.write('0\n')
 		del of
 	complete_cor_vector_instance.collect_and_merge_output(final_outputfname, len(files))	#collect_and_merge_output will use 0 to len(files)
+
+"""
+09-23-05
+	convert the incidence matrix into a jpeg file
+"""
+import Image, ImageDraw
+def get_char_dimension():
+	im = Image.new('RGB', (50,50))
+	draw = ImageDraw.Draw(im)
+	char_dimension = draw.textsize('a')
+	del im, draw
+	return char_dimension
+
+
+def get_text_region(text, dimension, rotate=1):
+	text_im = Image.new('RGB', dimension, (255,255,255))
+	text_draw = ImageDraw.Draw(text_im)
+	text_draw.text((0,0), text, fill=(0,0,255))
+	box = (0,0,dimension[0], dimension[1])
+	text_reg = text_im.crop(box)
+	if rotate:
+		text_reg = text_reg.transpose(Image.ROTATE_90)	#90 is anti-clockwise
+	return text_reg
+
+
+def draw_incidence_matrix(input_fname, output_fname):
+	import csv, Image, ImageDraw, os
+	ylength_output = os.popen('wc %s'%input_fname)
+	ylength_output = ylength_output.read()
+	ylength = int(ylength_output.split()[0])
 	
+	xlength_output = os.popen('%s %s'%(os.path.expanduser('~/script/shell/count_columns.py'), input_fname))
+	xlength_output = xlength_output.read()
+	xlength = int(xlength_output.split()[-1])-1	#the first column is gene id
+	
+	char_width, char_height = get_char_dimension()
+	text_dimension = (char_height, char_width*len(repr(xlength)))
+	
+	reader = csv.reader(open(input_fname,'r'), delimiter='\t')
+	im = Image.new('RGB',(xlength*text_dimension[0],ylength+text_dimension[1]),(255,255,255))
+	draw = ImageDraw.Draw(im)
+	
+	for i in range(xlength):	#write the text to a region and rotate anti-clockwise and paste it back
+		text_region = get_text_region(repr(i+1), (text_dimension[1], text_dimension[0]))	#text_dimension reverse because rotate
+		box = (i*text_dimension[0], 0, (i+1)*text_dimension[0], text_dimension[1])
+		im.paste(text_region, box)
+	
+	y_offset = text_dimension[1]
+	for row in reader:
+		for i in range(len(row)-1):	#skip the first gene id
+			index = i+1
+			if row[index]=='1':
+				draw.rectangle((i*text_dimension[0], y_offset, index*text_dimension[0], y_offset), fill=(0,255,0))
+		y_offset += 1
+	del reader
+	im.save(output_fname)
+	del im
+
 if __name__ == '__main__':
 	import sys
 	instance = get_edge_data('zhoudb','graphdb', sys.argv[1])
