@@ -1496,6 +1496,60 @@ def done(m_centrality, edge_desc, g):
 	else:
 		return False
 
+"""
+09-15-05
+	write the gene incidence matrix
+"""
+def gene_no_set_from_one_file(filename):
+	import csv
+	from sets import Set
+	gene_id_set = Set()
+	reader = csv.reader(file(filename), delimiter='\t')
+	for row in reader:
+		gene_id_set.add(row[0])
+	del reader
+	return gene_id_set
+
+def write_gene_incidence_matrix(dir, output_dir, hostname='zhoudb', dbname='graphdb', schema='hs_fim_138'):
+	import sys, os, csv
+	sys.path += [os.path.join(os.path.expanduser('~/script/annot/bin'))]
+	from codense.common import db_connect, get_gene_id2gene_no
+	from graph.complete_cor_vector import complete_cor_vector
+	from sets import Set
+	complete_cor_vector_instance = complete_cor_vector()
+	
+	(conn, curs) =  db_connect(hostname, dbname)
+	gene_id2no = get_gene_id2gene_no(curs, schema)
+	gene_id_list = list(gene_id2no.keys())
+	
+	final_outputfname = os.path.join(output_dir, '%s.gim'%schema)
+	label_fname = os.path.join(output_dir, '%s_0'%final_outputfname)
+	of = open(label_fname, 'w')
+	for gene_id in gene_id_list:
+		of.write('%s\n'%gene_id)
+	del of
+	
+	files = os.listdir(dir)
+	files = complete_cor_vector_instance.files_sort(files)
+	sys.stderr.write("\tTotally, %d files to be processed.\n"%len(files))
+	
+	for i in range(len(files)):
+		f = files[i]
+		print f
+		f_path = os.path.join(dir, f)
+		gene_id_set = gene_no_set_from_one_file(f_path)
+		
+		#write the gene incidence to the output_fname
+		output_fname = os.path.join(output_dir, '%s_%s'%(final_outputfname, i+1))
+		of = open(output_fname, 'w')
+		for gene_id in gene_id_list:
+			if gene_id in gene_id_set:
+				of.write('1\n')
+			else:
+				of.write('0\n')
+		del of
+	complete_cor_vector_instance.collect_and_merge_output(final_outputfname, len(files))	#collect_and_merge_output will use 0 to len(files)
+	
 if __name__ == '__main__':
 	import sys
 	instance = get_edge_data('zhoudb','graphdb', sys.argv[1])
