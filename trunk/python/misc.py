@@ -1499,6 +1499,8 @@ def done(m_centrality, edge_desc, g):
 """
 09-15-05
 	write the gene incidence matrix
+09-26-05
+	This part has been ported to DrawGenePresenceMatrix.py
 """
 def gene_no_set_from_one_file(filename):
 	import csv
@@ -1553,6 +1555,8 @@ def write_gene_incidence_matrix(dir, output_dir, hostname='zhoudb', dbname='grap
 """
 09-23-05
 	convert the incidence matrix into a jpeg file
+09-26-05
+	This part has been ported to DrawGenePresenceMatrix.py
 """
 import Image, ImageDraw
 def get_char_dimension():
@@ -1607,8 +1611,271 @@ def draw_incidence_matrix(input_fname, output_fname):
 	im.save(output_fname)
 	del im
 
+"""
+09-26-05
+	construct the cor_fname and sig_fname of a schema derived from and old schema
+09-26-05
+	NOTE: this function has a bug, cor_vector or sig_vector files are using haiyan's gene_index, it's
+	different from schema to schema. This function ignores it.
+"""
+import os
+def cor_sig_subset(old_datasets_mapping, new_datasets_mapping, old_schema, old_support, new_schema, \
+	new_support, dir=os.path.expanduser('~/bin/hhu_clustering/data/input/')):
+	import csv, Numeric, sys
+	from sets import Set
+	#construct the set of new datasets
+	sys.stderr.write("Getting the new_datasets_set.\n")
+	reader = csv.reader(file(new_datasets_mapping), delimiter='\t')
+	new_datasets_set = Set()
+	for row in reader:
+		new_datasets_set.add(row[0])
+	del reader
+	
+	#the index list records what we want	
+	sys.stderr.write("Getting the dataset_no_ls.\n")
+	reader = csv.reader(file(old_datasets_mapping), delimiter='\t')
+	dataset_no_ls = [0, 1]	#0 and 1 correspond to gene_id1 and gene_id2 in cor_fname or sig_fname
+	dataset_no = 1
+	for row in reader:
+		if row[0] in new_datasets_set:
+			dataset_no_ls.append(dataset_no+1)
+		dataset_no += 1
+	del reader
+	#start
+	sys.stderr.write("Start...\n")
+	old_cor_file = os.path.join(dir, '%s_%s.cor_vector'%(old_schema, old_support))
+	old_sig_file = os.path.join(dir, '%s_%s.sig_vector'%(old_schema, old_support))
+	new_cor_file = os.path.join(dir, '%s_%s.cor_vector'%(new_schema, new_support))
+	new_sig_file = os.path.join(dir, '%s_%s.sig_vector'%(new_schema, new_support))
+	reader1 = csv.reader(file(old_cor_file), delimiter='\t')
+	reader2 = csv.reader(file(old_sig_file), delimiter='\t')
+	writer1 = csv.writer(open(new_cor_file, 'w'), delimiter='\t')
+	writer2 = csv.writer(open(new_sig_file, 'w'), delimiter='\t')
+	for row1 in reader1:
+		row2 = reader2.next()
+		row1 = map(int, row1)	#Numeric.take is for numeric list
+		row2 = map(int, row2)
+		new_row1 = Numeric.take(row1, dataset_no_ls)
+		new_row2 = Numeric.take(row2, dataset_no_ls)
+		new_sig_vector = map(int, new_row2[2:])
+		if sum(new_sig_vector)>=new_support:	#meet the new min support
+			writer1.writerow(new_row1)
+			writer2.writerow(new_row2)
+	del reader1, reader2, writer1, writer2
+
+"""
+09-26-05
+	draw a function vs condition 2D map
+"""
+def draw_function_map(good_cluster_table, output_fname, hostname='zhoudb', dbname='graphdb', schema='mm_fim_97'):
+	import sys, os, Image, ImageDraw
+	sys.path += [os.path.join(os.path.expanduser('~/script/annot/bin'))]
+	from codense.common import db_connect, get_go_no2name
+	from sets import Set
+	from MpiFromDatasetSignatureToPattern import encodeOccurrenceBv, decodeOccurrenceToBv, decodeOccurrence
+	(conn, curs) =  db_connect(hostname, dbname)
+	no_of_datasets = 0
+	go_no2name = get_go_no2name(curs, schema)
+	
+	go_no2recurrence_cluster_id = {}
+	curs.execute("DECLARE crs CURSOR FOR SELECT mcl_id, recurrence_array, go_no_list from %s"\
+		%good_cluster_table)
+	curs.execute("fetch 5000 from crs")
+	rows = curs.fetchall()
+	while rows:
+		for row in rows:
+			mcl_id, recurrence_array, go_no_list = row
+			recurrence_array = recurrence_array[1:-1].split(',')
+			recurrence_array = map(int, recurrence_array)
+			if no_of_datasets == 0:
+				no_of_datasets = len(recurrence_array)
+			go_no_list = go_no_list[1:-1].split(',')
+			go_no_list = map(int, go_no_list)
+			for go_no in go_no_list:
+				if go_no not in go_no2recurrence_cluster_id:
+					go_no2recurrence_cluster_id[go_no] = [encodeOccurrenceBv(recurrence_array), Set([mcl_id])]	#use Set() because mcl_id has duplicates due to different p-values
+				else:
+					go_no2recurrence_cluster_id[go_no][0] = go_no2recurrence_cluster_id[go_no][0] | encodeOccurrenceBv(recurrence_array)
+					go_no2recurrence_cluster_id[go_no][1].add(mcl_id)
+		curs.execute("fetch 5000 from crs")
+		rows = curs.fetchall()
+	
+	recurrence_go_no_rec_array_cluster_id_ls = []
+	for go_no in go_no2recurrence_cluster_id:
+		encoded_recurrence, mcl_id_set = go_no2recurrence_cluster_id[go_no]
+		recurrence_array = decodeOccurrence(encoded_recurrence)	#not binary vector
+		recurrence = len(recurrence_array)
+		recurrence_go_no_rec_array_cluster_id_ls.append([recurrence, go_no, recurrence_array, mcl_id_set])
+	
+	recurrence_go_no_rec_array_cluster_id_ls.sort()
+	
+	char_width, char_height = get_char_dimension()
+	no_of_functions = len(recurrence_go_no_rec_array_cluster_id_ls)
+	dataset_no_length = len(repr(no_of_datasets))
+	function_name_length = 40	#truncate if exceed
+	dataset_no_dimension = (char_width*dataset_no_length, char_height)	#one is not rotated, one is rotated
+	no_of_clusters_dimension = (char_width*7, char_height)	#will rotate
+	function_name_dimension = (char_width*function_name_length, char_height)	#will rotate
+	
+	x_offset0 = 0
+	x_offset1 = dataset_no_dimension[0]
+	y_offset0 = 0
+	y_offset1 = function_name_dimension[0]
+	y_offset2 = y_offset1 + no_of_datasets*dataset_no_dimension[1]
+	y_offset3 = y_offset2 + dataset_no_dimension[0]
+	whole_dimension = (x_offset1+no_of_functions*char_height, \
+		y_offset3+no_of_clusters_dimension[0])
+	
+	im = Image.new('RGB',(whole_dimension[0],whole_dimension[1]),(255,255,255))
+	draw = ImageDraw.Draw(im)
+	#dataset_no section
+	for i in range(no_of_datasets):
+		text_region = get_text_region(repr(i+1), dataset_no_dimension, rotate=0)	#no rotate
+		box = (x_offset0, y_offset1+i*dataset_no_dimension[1], x_offset1, y_offset1+(i+1)*dataset_no_dimension[1])
+		im.paste(text_region, box)
+	#
+	for i in range(len(recurrence_go_no_rec_array_cluster_id_ls)):
+		recurrence, go_no, recurrence_array, mcl_id_set = recurrence_go_no_rec_array_cluster_id_ls[i]
+		x_offset_left = x_offset1+i*function_name_dimension[1]
+		x_offset_right = x_offset1+(i+1)*function_name_dimension[1]
+		#function_name
+		go_name = go_no2name[go_no]
+		if len(go_name)>function_name_length:
+			go_name = go_name[:function_name_length]
+		text_region = get_text_region(go_name, function_name_dimension)	#rotate
+		box = (x_offset_left, y_offset0, x_offset_right, y_offset1)
+		im.paste(text_region, box)
+		#
+		for dataset_no in recurrence_array:
+			draw.rectangle((x_offset_left, y_offset1+(dataset_no-1)*dataset_no_dimension[1], x_offset_right, y_offset1+dataset_no*dataset_no_dimension[1]), fill=(0,255,0))
+		
+		text_region = get_text_region(repr(recurrence), dataset_no_dimension)	#rotate
+		box = (x_offset_left, y_offset2, x_offset_right, y_offset3)
+		im.paste(text_region, box)
+		
+		text_region = get_text_region(repr(len(mcl_id_set)), no_of_clusters_dimension)	#rotate
+		box = (x_offset_left, y_offset3, x_offset_right, whole_dimension[1])
+		im.paste(text_region, box)
+	im.save(output_fname)
+	del im		
+
+"""
+09-26-05
+	transform TF information (gene_ids and tf_names) into Darwin format
+"""
+def tf_darwin_format(cluster_bs_table, good_cluster_table, ofname, hostname='zhoudb', dbname='graphdb', schema='mm_fim_97'):
+	import sys, os, csv
+	sys.path += [os.path.join(os.path.expanduser('~/script/annot/bin'))]
+	from codense.common import db_connect, get_gene_no2gene_id, get_mt_no2tf_name, get_mcl_id2tf_set, dict_map
+	conn, curs = db_connect(hostname, dbname, schema)
+	gene_no2id = get_gene_no2gene_id(curs)
+	mt_no2tf_name = get_mt_no2tf_name()
+	mcl_id2tf_set = get_mcl_id2tf_set(curs, cluster_bs_table, mt_no2tf_name)
+	
+	of = open(ofname, 'w')
+	of.write('r:=[\n')
+	curs.execute("DECLARE crs CURSOR FOR select mcl_id, vertex_set from %s"%good_cluster_table)
+	curs.execute("fetch 5000 from crs")
+	rows = curs.fetchall()
+	while rows:
+		for row in rows:
+			mcl_id, vertex_set = row
+			if mcl_id in mcl_id2tf_set:
+				vertex_set = vertex_set[1:-1].split(',')
+				vertex_set = map(int, vertex_set)
+				vertex_set = dict_map(gene_no2id, vertex_set)
+				tf_list = list(mcl_id2tf_set[mcl_id])
+				tf_list = map(list, tf_list)	#first transform to list, so will have []
+				for i in range(len(tf_list)):
+					tf_list[i] = map(list, tf_list[i])	#one tf_list[i] is (tf_name_tuple, ratio_tuple)
+				tf_list = map(repr, tf_list)	#second transform inner list to string
+				row = [repr(vertex_set)] + tf_list
+				of.write('[%s],\n'%(','.join(row)))
+		curs.execute("fetch 5000 from crs")
+		rows = curs.fetchall()
+	of.write('[]]:\n')	#add the last blank list
+	del of
+
+"""
+09-27-05
+	construct edge_table of new_schema from old_schema's. After some datasets of old_schema
+	are deleted, new_schema retains the remaining datasets order.
+"""
+def index_take(ls, index_list):
+	ls_to_return = []
+	for index in index_list:
+		ls_to_return.append(ls[index])
+	return ls_to_return
+
+
+def edge_table_from_old_schema(old_datasets_mapping, new_datasets_mapping, old_schema, new_schema, new_support, \
+	hostname='zhoudb', dbname='graphdb', edge_table='edge_cor_vector', commit=0):
+	import csv, sys, os
+	from sets import Set
+	sys.path += [os.path.join(os.path.expanduser('~/script/annot/bin'))]
+	from codense.common import db_connect, get_gene_no2gene_id, get_gene_id2gene_no, dict_map
+	conn, curs = db_connect(hostname, dbname)
+	old_gene_no2id = get_gene_no2gene_id(curs, old_schema)
+	new_gene_id2no = get_gene_id2gene_no(curs, new_schema)
+	#construct the set of new datasets
+	sys.stderr.write("Getting the new_datasets_set.\n")
+	reader = csv.reader(file(new_datasets_mapping), delimiter='\t')
+	new_datasets_set = Set()
+	for row in reader:
+		new_datasets_set.add(row[0])
+	del reader
+	
+	#the index list records what we want	
+	sys.stderr.write("Getting the index_list.\n")
+	reader = csv.reader(file(old_datasets_mapping), delimiter='\t')
+	index_list = []
+	index = 0
+	for row in reader:
+		if row[0] in new_datasets_set:
+			index_list.append(index)
+		index += 1
+	del reader
+	print "index_list is ",index_list
+	#start
+	sys.stderr.write("Start...\n")
+	curs.execute("DECLARE crs CURSOR FOR SELECT edge_name, cor_vector, sig_vector from %s.%s"%\
+		(old_schema, edge_table))
+	curs.execute("fetch 5000 from crs")
+	rows = curs.fetchall()
+	counter = 0
+	insert_counter = 0
+	while rows:
+		for row in rows:
+			edge_name, cor_vector, sig_vector = row
+			edge_name = edge_name[1:-1].split(',')
+			edge_name = map(int, edge_name)
+			gene_id_tuple = dict_map(old_gene_no2id, edge_name)
+			if gene_id_tuple[0] in new_gene_id2no and gene_id_tuple[1] in new_gene_id2no:
+				cor_vector = cor_vector[1:-1].split(',')
+				sig_vector = sig_vector[1:-1].split(',')
+				new_cor_vector = index_take(cor_vector, index_list)
+				new_sig_vector = index_take(sig_vector, index_list)
+				new_sig_vector_int_form = map(int, new_sig_vector)
+				if sum(new_sig_vector_int_form)>=new_support:
+					gene_no1 = new_gene_id2no[gene_id_tuple[0]]
+					gene_no2 = new_gene_id2no[gene_id_tuple[1]]
+					if gene_no1<gene_no2:
+						edge_name = '{%s,%s}'%(gene_no1, gene_no2)
+					else:
+						edge_name = '{%s,%s}'%(gene_no2, gene_no1)
+					curs.execute("insert into %s.%s(edge_name, cor_vector, sig_vector) \
+						values ('%s', '{%s}', '{%s}')"%\
+						(new_schema, edge_table, edge_name, ','.join(new_cor_vector), ','.join(new_sig_vector)))
+					insert_counter += 1
+			counter += 1
+		sys.stderr.write("%s%s\t%s"%('\0x08'*20,counter, insert_counter))
+		curs.execute("fetch 5000 from crs")
+		rows = curs.fetchall()
+	if commit:
+		curs.execute("set search_path to %s"%new_schema)
+		curs.execute("create index %s_edge_name_idx on %s.%s(edge_name)"%(new_schema, edge_table, new_schema, edge_table))
+		conn.commit()
+
 if __name__ == '__main__':
 	import sys
-	instance = get_edge_data('zhoudb','graphdb', sys.argv[1])
-	instance.run()
-	#haiyan_cor_vector_file2graph_modeling_input(sys.argv[1], sys.argv[2], sys.argv[3], int(sys.argv[4]))
+	edge_table_from_old_schema(sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], int(sys.argv[5]), commit=int(sys.argv[6]))
