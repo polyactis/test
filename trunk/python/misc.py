@@ -1872,8 +1872,9 @@ def edge_table_from_old_schema(old_datasets_mapping, new_datasets_mapping, old_s
 		curs.execute("fetch 5000 from crs")
 		rows = curs.fetchall()
 	if commit:
-		curs.execute("set search_path to %s"%new_schema)
-		curs.execute("create index %s_edge_name_idx on %s.%s(edge_name)"%(new_schema, edge_table, new_schema, edge_table))
+		conn.commit()
+		conn, curs = db_connect(hostname, dbname, new_schema)
+		curs.execute("create index %s_edge_name_idx on %s(edge_name)"%(edge_table, edge_table))
 		conn.commit()
 
 if __name__ == '__main__':
