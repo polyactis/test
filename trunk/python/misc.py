@@ -594,27 +594,35 @@ def cluster_id_set_from_gene_p_table(input_fname, hostname='zhoudb', dbname='gra
 	return set_to_return
 
 
-
-
-def cluster_size_list_from_p_gene_table(input_fname, hostname='zhoudb', dbname='graphdb', schema='sc_new_38'):
+"""
+10-03-05
+	size is already in p_gene_table, no more mcl_table linking
+"""
+def cluster_id_size_list_from_p_gene_table(input_fname, hostname='zhoudb', dbname='graphdb', schema='sc_new_38'):
 	from sets import Set
 	set_to_return = Set()
-	p_gene_table = "p_gene_%s_e5"%input_fname
-	gene_p_table = "gene_p_%s_e5_p01"%input_fname
-	mcl_table = 'mcl_%s'%input_fname
-	from codense.common import db_connect
-	import psycopg
-	conn, curs = db_connect(ho65stname, dbname, schema)
-	curs.execute("select distinct m.mcl_id,array_upper(m.vertex_set,1) from %s m, %s p where p.mcl_id=m.mcl_id"%\
-		(mcl_table, p_gene_table))
+	from codense.common import db_connect, form_schema_tables
+	import psycopg, sys, os
+	schema_instance = form_schema_tables(input_fname, acc_cut_off=0.6)
+	conn, curs = db_connect(hostname, dbname, schema)
+	curs.execute("DECLARE crs CURSOR FOR select mcl_id, cluster_size_cut_off from %s"%schema_instance.p_gene_table)
+		#distinct is not necessary, because set_to_return will judge it
+	curs.execute("fetch 5000 from crs")
 	rows = curs.fetchall()
 	ls_to_return = []
-	for row in rows:
-		mcl_id = row[0]
-		if mcl_id not in set_to_return:
-			set_to_return.add(mcl_id)
-			ls_to_return.append(row[1])
+	counter = 0
+	while rows:
+		for row in rows:
+			mcl_id = row[0]
+			if mcl_id not in set_to_return:
+				set_to_return.add(mcl_id)
+				ls_to_return.append(row)
+			counter += 1
+		sys.stderr.write('%s%s'%('\x08'*20, counter))
+		curs.execute("fetch 5000 from crs")
+		rows = curs.fetchall()
 	return ls_to_return
+
 
 def cluster_size_list_from_gene_p_table(input_fname, hostname='zhoudb', dbname='graphdb', schema='sc_new_38'):
 	from sets import Set
@@ -636,30 +644,31 @@ def cluster_size_list_from_gene_p_table(input_fname, hostname='zhoudb', dbname='
 			ls_to_return.append(row[1])
 	return ls_to_return
 
-def cluster_id_size_list_from_p_gene_table(input_fname, hostname='zhoudb', dbname='graphdb', schema='sc_new_38'):
+
+"""
+10-03-05
+	good_cluster_table is ready, so directly get cluster information from there, not gene_p_table
+"""
+def cluster_id_size_list_from_good_cl_table(input_fname, hostname='zhoudb', dbname='graphdb', schema='sc_new_38'):
 	from sets import Set
-	set_to_return = Set()
-	p_gene_table = "p_gene_%s_e5"%input_fname
-	gene_p_table = "gene_p_%s_e5_p01"%input_fname
-	mcl_table = 'mcl_%s'%input_fname
-	from codense.common import db_connect
+	from codense.common import db_connect, form_schema_tables
 	import psycopg
 	conn, curs = db_connect(hostname, dbname, schema)
-	curs.execute("select m.mcl_id,array_upper(m.vertex_set,1) from %s m, %s p where p.mcl_id=m.mcl_id"%\
-		(mcl_table, p_gene_table))
+	schema_instance = form_schema_tables(input_fname, acc_cut_off=0.6)
+	curs.execute("select mcl_id,array_upper(vertex_set,1) from %s "%schema_instance.good_cluster_table)
+		#size in good_cluster_table is a bug, so still use array_upper()
 	rows = curs.fetchall()
 	ls_to_return = []
 	for row in rows:
 		mcl_id = row[0]
-		if mcl_id not in set_to_return:
-			set_to_return.add(mcl_id)
-			ls_to_return.append(row)
+		ls_to_return.append(row)
 	return ls_to_return
+
+
 """
 05-24-05
 	not finished
 """
-
 def return_edge_set_of_summary_graph(summary_gfile, cluster_edge_file, output_fname):
 	import csv,sys
 	summary_gf = open(summary_gfile,'r')
@@ -1761,7 +1770,9 @@ def draw_function_map(good_cluster_table, output_fname, hostname='zhoudb', dbnam
 
 """
 09-26-05
-	transform TF information (gene_ids and tf_names) into Darwin format
+	transform TF information (gene_ids and tf_names) into Darwin format	
+09-28-05
+       goes to Schema2Darwin.py
 """
 def tf_darwin_format(cluster_bs_table, good_cluster_table, ofname, hostname='zhoudb', dbname='graphdb', schema='mm_fim_97'):
 	import sys, os, csv
