@@ -1,6 +1,6 @@
 #a makefile for Boost.Graph
 
-GraphTarget	= bgl_test kevin-bacon quick_tour undirected connected_components file_dependencies subgraph
+GraphTarget	= bgl_test kevin-bacon quick_tour undirected connected_components file_dependencies subgraph johnson-eg
 GslLib	= -lgsl -lgslcblas
 CxxFlags	= -O2
 CxxCompiler	= g++
