@@ -664,6 +664,30 @@ def cluster_id_size_list_from_good_cl_table(input_fname, hostname='zhoudb', dbna
 		ls_to_return.append(row)
 	return ls_to_return
 
+"""
+10-03-05
+	the most orginal data before prediciton
+"""
+def cluster_id_size_list_from_mcl_table(input_fname, hostname='zhoudb', dbname='graphdb', schema='sc_new_38'):
+	from sets import Set
+	from codense.common import db_connect, form_schema_tables
+	import psycopg, sys,os
+	conn, curs = db_connect(hostname, dbname, schema)
+	schema_instance = form_schema_tables(input_fname, acc_cut_off=0.6)
+	curs.execute("DECLARE crs CURSOR FOR select mcl_id,array_upper(vertex_set,1) from %s "%schema_instance.mcl_table)
+	curs.execute("fetch 5000 from crs")
+	rows = curs.fetchall()
+	ls_to_return = []
+	counter = 0
+	while rows:
+		for row in rows:
+			mcl_id = row[0]
+			ls_to_return.append(row)
+			counter += 1
+		sys.stderr.write('%s%s'%('\x08'*20, counter))
+		curs.execute("fetch 5000 from crs")
+		rows = curs.fetchall()
+	return ls_to_return
 
 """
 05-24-05
@@ -1249,6 +1273,12 @@ def hist_plot_rec_con_list(rec_con_list, which_column=0):
 	rec_list = [row[which_column] for row in rec_con_list]
 	from rpy import r
 	r.hist(rec_list,main='histogram',xlab='something',ylab='freq')
+	return None	#10-03-05 avoid r.hist() throw chunks of data to the screen
+	
+def hist_plot_list(input_list):
+	from rpy import r
+	r.hist(input_list,main='histogram',xlab='something',ylab='freq')
+	return None
 
 """
 07-29-05
@@ -1887,6 +1917,55 @@ def edge_table_from_old_schema(old_datasets_mapping, new_datasets_mapping, old_s
 		conn, curs = db_connect(hostname, dbname, new_schema)
 		curs.execute("create index %s_edge_name_idx on %s(edge_name)"%(edge_table, edge_table))
 		conn.commit()
+
+"""
+10-06-05
+	get mcl_id2accuracy, independent version of class PredictionFilterByClusterSize's.
+"""
+def get_mcl_id2accuracy(p_gene_table, is_correct_type=2, hostname='zhoudb', dbname='graphdb', schema='hs_fim_40'):
+	import csv, sys, os
+	from sets import Set
+	sys.path += [os.path.join(os.path.expanduser('~/script/annot/bin'))]
+	from codense.common import db_connect
+	from PredictionFilterByClusterSize import PredictionFilterByClusterSize
+	conn, curs = db_connect(hostname, dbname, schema)
+	b_instance = PredictionFilterByClusterSize()
+	crs_sentence = 'DECLARE crs CURSOR FOR SELECT p_gene_id, gene_no, go_no, is_correct, is_correct_l1, \
+			is_correct_lca, avg_p_value, no_of_clusters, cluster_array, p_value_cut_off, recurrence_cut_off, \
+			connectivity_cut_off, cluster_size_cut_off, unknown_cut_off, depth_cut_off, mcl_id, lca_list  \
+			from %s'%p_gene_table
+	mcl_id2accuracy = b_instance.get_mcl_id2accuracy(curs,p_gene_table, crs_sentence, is_correct_type)
+	return mcl_id2accuracy
+
+def return_mcl_id_list_given_acc_range(mcl_id2accuracy, min_acc, max_acc):
+	mcl_id_list = []
+	for mcl_id, accuracy in mcl_id2accuracy.iteritems():
+		if accuracy>=min_acc and accuracy<=max_acc:
+			mcl_id_list.append(mcl_id)
+	return mcl_id_list
+
+def get_gene_set_given_mcl_id_ls(mcl_id_list, input_fname, acc_cut_off=0.6, hostname='zhoudb', dbname='graphdb', schema='hs_fim_40'):
+	import csv, sys, os
+	from sets import Set
+	sys.path += [os.path.join(os.path.expanduser('~/script/annot/bin'))]
+	from codense.common import db_connect, form_schema_tables
+	conn, curs = db_connect(hostname, dbname, schema)
+	schema_instance = form_schema_tables(input_fname, acc_cut_off)
+	gene_set = Set()
+	mcl_id_set = Set(mcl_id_list)
+	curs.execute("DECLARE crs CURSOR FOR select mcl_id, vertex_set from %s"%schema_instance.mcl_table)
+	curs.execute("fetch 5000 from crs")
+	rows = curs.fetchall()
+	while rows:
+		for row in rows:
+			mcl_id, vertex_set = row
+			if mcl_id in mcl_id_set:
+				vertex_set = vertex_set[1:-1].split(',')
+				vertex_set = map(int, vertex_set)
+				gene_set |= Set(vertex_set)
+		curs.execute("fetch 5000 from crs")
+		rows = curs.fetchall()
+	return gene_set
 
 if __name__ == '__main__':
 	import sys
