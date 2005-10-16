@@ -1,6 +1,6 @@
 #!/usr/bin/env mpipython
 from Scientific import MPI
-import sys
+import sys, cPickle	#10-15-05 cPickle is used to serialize objects
 from Numeric import Float, array, Int, zeros
 
 communicator = MPI.world.duplicate()
@@ -70,3 +70,17 @@ else:
 communicator.broadcast(data, 0)
 
 print "%s has data: %s"%(communicator.rank, repr(data))
+
+sys.stdout.flush()
+sys.stderr.flush()
+communicator.barrier()
+
+if communicator.rank==0:
+	for i in range(1, communicator.size):
+		ls = [i]*5
+		ls_pickle = cPickle.dumps(ls,-1)
+		communicator.send(ls_pickle,i,0)
+else:
+	data, source, tag = communicator.receiveString(0, None)
+	ls = cPickle.loads(data)
+	print "No.",communicator.rank,"got",ls
