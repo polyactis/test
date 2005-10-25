@@ -1920,20 +1920,28 @@ def edge_table_from_old_schema(old_datasets_mapping, new_datasets_mapping, old_s
 
 """
 10-06-05
-	get mcl_id2accuracy, independent version of class PredictionFilterByClusterSize's.
+	get mcl_id2accuracy, independent version of class MpiPredictionFilter's.
+10-24-05
+	get it from MpiPredictionFilter
 """
 def get_mcl_id2accuracy(p_gene_table, is_correct_type=2, hostname='zhoudb', dbname='graphdb', schema='hs_fim_40'):
 	import csv, sys, os
 	from sets import Set
 	sys.path += [os.path.join(os.path.expanduser('~/script/annot/bin'))]
 	from codense.common import db_connect
-	from PredictionFilterByClusterSize import PredictionFilterByClusterSize
+	from MpiPredictionFilter import MpiPredictionFilter
 	conn, curs = db_connect(hostname, dbname, schema)
-	b_instance = PredictionFilterByClusterSize()
+	b_instance = MpiPredictionFilter()
+	crs_sentence = 'DECLARE crs CURSOR FOR SELECT p.p_gene_id, p.gene_no, p.go_no, p.is_correct, p.is_correct_l1, \
+				p.is_correct_lca, p.avg_p_value, p.no_of_clusters, p.cluster_array, p.p_value_cut_off, p.recurrence_cut_off, \
+				p.connectivity_cut_off, p.cluster_size_cut_off, p.unknown_cut_off, p.depth_cut_off, p.mcl_id, p.lca_list, \
+				p.vertex_gradient, p.edge_gradient from %s p'%(p_gene_table)
+	"""
 	crs_sentence = 'DECLARE crs CURSOR FOR SELECT p_gene_id, gene_no, go_no, is_correct, is_correct_l1, \
 			is_correct_lca, avg_p_value, no_of_clusters, cluster_array, p_value_cut_off, recurrence_cut_off, \
 			connectivity_cut_off, cluster_size_cut_off, unknown_cut_off, depth_cut_off, mcl_id, lca_list  \
 			from %s'%p_gene_table
+	"""
 	mcl_id2accuracy = b_instance.get_mcl_id2accuracy(curs,p_gene_table, crs_sentence, is_correct_type)
 	return mcl_id2accuracy
 
@@ -1967,6 +1975,57 @@ def get_gene_set_given_mcl_id_ls(mcl_id_list, input_fname, acc_cut_off=0.6, host
 		rows = curs.fetchall()
 	return gene_set
 
+"""
+10-14-05
+"""
+def p_gene_id_set_from_gene_p_table(gene_p_table, hostname='zhoudb', dbname='graphdb', schema='sc_new_38'):
+	from sets import Set
+	p_gene_id_set = Set()
+	from codense.common import db_connect
+	import psycopg
+	conn, curs = db_connect(hostname, dbname, schema)
+	curs.execute("select p_gene_id from %s"%gene_p_table)
+	rows = curs.fetchall()
+	for row in rows:
+		p_gene_id = row[0]
+		p_gene_id_set.add(p_gene_id)
+	return p_gene_id_set
+
+"""
+10-17-05
+	choose predictions given a p_gene_id_set
+"""
+def p_gene_table_transfer_given_p_gene_id_set(old_p_gene_table, new_p_gene_table, p_gene_id_set, hostname='zhoudb', dbname='graphdb', schema='hs_fim_40'):
+	from sets import Set
+	import sys, os
+	sys.path += [os.path.expanduser('~/script/annot/bin')]
+	from codense.common import db_connect, p_gene_id_set_from_gene_p_table
+	from MpiPredictionFilter import MpiPredictionFilter, prediction_attributes
+	conn, curs = db_connect(hostname, dbname, schema)
+	MpiPredictionFilter_instance = MpiPredictionFilter()
+	MpiPredictionFilter_instance.createGeneTable(curs, new_p_gene_table)
+	crs_sentence = "DECLARE crs CURSOR FOR SELECT p.p_gene_id, p.gene_no, p.go_no, p.is_correct, p.is_correct_l1, \
+		p.is_correct_lca, p.avg_p_value, p.no_of_clusters, p.cluster_array, p.p_value_cut_off, p.recurrence_cut_off, \
+		p.connectivity_cut_off, p.cluster_size_cut_off, p.unknown_cut_off, p.depth_cut_off, p.mcl_id, p.lca_list, p.vertex_gradient,\
+		p.edge_gradient, 'vertex_set', 'edge_set', 'd_matrix', 'recurrence_array' \
+		from %s p"%(old_p_gene_table)
+	curs.execute("%s"%(crs_sentence))
+	curs.execute("fetch 5000 from crs")
+	rows = curs.fetchall()
+	counter = 0
+	while rows:
+		for row in rows:
+			p_attr_instance = prediction_attributes(row, type=3)
+			counter += 1
+			if p_attr_instance.p_gene_id in p_gene_id_set:
+				MpiPredictionFilter_instance.submit_to_p_gene_table(curs, new_p_gene_table, p_attr_instance)
+		sys.stderr.write("%s%s"%('\x08'*20, counter))
+		curs.execute("fetch 5000 from crs")
+		rows = curs.fetchall()
+	curs.execute("end")
+	del conn, curs
+	
+	
 if __name__ == '__main__':
 	import sys
 	edge_table_from_old_schema(sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], int(sys.argv[5]), commit=int(sys.argv[6]))
