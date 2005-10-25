@@ -1929,9 +1929,8 @@ def get_mcl_id2accuracy(p_gene_table, is_correct_type=2, hostname='zhoudb', dbna
 	from sets import Set
 	sys.path += [os.path.join(os.path.expanduser('~/script/annot/bin'))]
 	from codense.common import db_connect
-	from MpiPredictionFilter import MpiPredictionFilter
+	from MpiPredictionFilter import prediction_attributes
 	conn, curs = db_connect(hostname, dbname, schema)
-	b_instance = MpiPredictionFilter()
 	crs_sentence = 'DECLARE crs CURSOR FOR SELECT p.p_gene_id, p.gene_no, p.go_no, p.is_correct, p.is_correct_l1, \
 				p.is_correct_lca, p.avg_p_value, p.no_of_clusters, p.cluster_array, p.p_value_cut_off, p.recurrence_cut_off, \
 				p.connectivity_cut_off, p.cluster_size_cut_off, p.unknown_cut_off, p.depth_cut_off, p.mcl_id, p.lca_list, \
@@ -1942,7 +1941,32 @@ def get_mcl_id2accuracy(p_gene_table, is_correct_type=2, hostname='zhoudb', dbna
 			connectivity_cut_off, cluster_size_cut_off, unknown_cut_off, depth_cut_off, mcl_id, lca_list  \
 			from %s'%p_gene_table
 	"""
-	mcl_id2accuracy = b_instance.get_mcl_id2accuracy(curs,p_gene_table, crs_sentence, is_correct_type)
+	curs.execute("%s"%crs_sentence)
+	curs.execute("fetch 5000 from crs")
+	rows = curs.fetchall()
+	counter = 0
+	mcl_id2accuracy = {}
+	while rows:
+		for row in rows:
+			prediction_attr_instance = prediction_attributes(row)
+			if prediction_attr_instance.mcl_id not in mcl_id2accuracy:
+				mcl_id2accuracy[prediction_attr_instance.mcl_id]  = []
+			mcl_id2accuracy[prediction_attr_instance.mcl_id].append(prediction_attr_instance.is_correct_dict[is_correct_type])
+			
+			counter += 1
+		sys.stderr.write("%s%s"%('\x08'*20, counter))
+		curs.execute("fetch 5000 from crs")
+		rows = curs.fetchall()
+	curs.execute("close crs")
+	for mcl_id, is_correct_ls in mcl_id2accuracy.iteritems():
+		only_one_ls = map((lambda x: int(x>=1)), is_correct_ls)	#10-12-05 only correct(1) predictions are counted as 1
+		one_or_zero_ls = map((lambda x: int(x>=0)), is_correct_ls)	#10-12-05 only correct(1) or wrong(0) are counted as 1, -1 is discarded
+		if sum(one_or_zero_ls)==0:	#10-16-05	avoid the sum to be zero
+			mcl_id2accuracy[mcl_id]=0
+		else:
+			accuracy = sum(only_one_ls)/float(sum(one_or_zero_ls))	#10-12-05 sum the one_or_zero_ls
+			mcl_id2accuracy[mcl_id] = accuracy
+	sys.stderr.write(" %s clusters. Done.\n"%len(mcl_id2accuracy))
 	return mcl_id2accuracy
 
 def return_mcl_id_list_given_acc_range(mcl_id2accuracy, min_acc, max_acc):
@@ -1951,6 +1975,106 @@ def return_mcl_id_list_given_acc_range(mcl_id2accuracy, min_acc, max_acc):
 		if accuracy>=min_acc and accuracy<=max_acc:
 			mcl_id_list.append(mcl_id)
 	return mcl_id_list
+
+"""
+10-24-05
+"""
+def partition_mcl_id_into_gaps_based_on_accuracy(mcl_id2accuracy):
+	mcl_id_gap_list = []
+	for i in range(10):
+		mcl_id_gap_list.append([])
+	for mcl_id, accuracy in mcl_id2accuracy.iteritems():
+		if accuracy>=0.0 and accuracy<0.1:
+			mcl_id_gap_list[0].append(mcl_id)
+		elif accuracy>=0.1 and accuracy<0.2:
+			mcl_id_gap_list[1].append(mcl_id)
+		elif accuracy>=0.2 and accuracy<0.3:
+			mcl_id_gap_list[2].append(mcl_id)
+		elif accuracy>=0.3 and accuracy<0.4:
+			mcl_id_gap_list[3].append(mcl_id)
+		elif accuracy>=0.4 and accuracy<0.5:
+			mcl_id_gap_list[4].append(mcl_id)
+		elif accuracy>=0.5 and accuracy<0.6:
+			mcl_id_gap_list[5].append(mcl_id)
+		elif accuracy>=0.6 and accuracy<0.7:
+			mcl_id_gap_list[6].append(mcl_id)
+		elif accuracy>=0.7 and accuracy<0.8:
+			mcl_id_gap_list[7].append(mcl_id)
+		elif accuracy>=0.8 and accuracy<0.9:
+			mcl_id_gap_list[8].append(mcl_id)
+		elif accuracy>=0.9 and accuracy<=1.0:
+			mcl_id_gap_list[9].append(mcl_id)
+	return mcl_id_gap_list
+
+"""
+10-24-05
+"""
+def	get_mcl_id2gradient_score_list(p_gene_table, hostname='zhoudb', dbname='graphdb', schema='hs_fim_40'):
+	import csv, sys, os
+	sys.path += [os.path.join(os.path.expanduser('~/script/annot/bin'))]
+	from codense.common import db_connect
+	from MpiPredictionFilter import prediction_attributes
+	conn, curs = db_connect(hostname, dbname, schema)
+	crs_sentence = 'DECLARE crs CURSOR FOR SELECT p.p_gene_id, p.gene_no, p.go_no, p.is_correct, p.is_correct_l1, \
+				p.is_correct_lca, p.avg_p_value, p.no_of_clusters, p.cluster_array, p.p_value_cut_off, p.recurrence_cut_off, \
+				p.connectivity_cut_off, p.cluster_size_cut_off, p.unknown_cut_off, p.depth_cut_off, p.mcl_id, p.lca_list, \
+				p.vertex_gradient, p.edge_gradient from %s p'%(p_gene_table)
+	"""
+	crs_sentence = 'DECLARE crs CURSOR FOR SELECT p_gene_id, gene_no, go_no, is_correct, is_correct_l1, \
+			is_correct_lca, avg_p_value, no_of_clusters, cluster_array, p_value_cut_off, recurrence_cut_off, \
+			connectivity_cut_off, cluster_size_cut_off, unknown_cut_off, depth_cut_off, mcl_id, lca_list  \
+			from %s'%p_gene_table
+	"""
+	curs.execute("%s"%crs_sentence)
+	curs.execute("fetch 5000 from crs")
+	rows = curs.fetchall()
+	counter = 0
+	mcl_id2gradient_score_list = {}
+	while rows:
+		for row in rows:
+			prediction_attr_instance = prediction_attributes(row)
+			if prediction_attr_instance.mcl_id not in mcl_id2gradient_score_list:
+				mcl_id2gradient_score_list[prediction_attr_instance.mcl_id]  = []
+			mcl_id2gradient_score_list[prediction_attr_instance.mcl_id].append(prediction_attr_instance.p_value_cut_off)
+			
+			counter += 1
+		sys.stderr.write("%s%s"%('\x08'*20, counter))
+		curs.execute("fetch 5000 from crs")
+		rows = curs.fetchall()
+	curs.execute("close crs")
+	sys.stderr.write(" %s clusters. Done.\n"%len(mcl_id2gradient_score_list))
+	return mcl_id2gradient_score_list
+
+"""
+10-24-05 for a certain accuracy range, see the distribution of the gradient scores
+"""
+def partition_gradient_score_based_on_cluster_accuracy(mcl_id2gradient_score_list, mcl_id2accuracy):
+	gradient_score_list_gap_list = []
+	for i in range(10):
+		gradient_score_list_gap_list.append([])
+	for mcl_id, gradient_score_list in mcl_id2gradient_score_list.iteritems():
+		accuracy = mcl_id2accuracy[mcl_id]
+		if accuracy>=0.0 and accuracy<0.1:
+			gradient_score_list_gap_list[0] += gradient_score_list
+		elif accuracy>=0.1 and accuracy<0.2:
+			gradient_score_list_gap_list[1] += gradient_score_list
+		elif accuracy>=0.2 and accuracy<0.3:
+			gradient_score_list_gap_list[2] += gradient_score_list
+		elif accuracy>=0.3 and accuracy<0.4:
+			gradient_score_list_gap_list[3] += gradient_score_list
+		elif accuracy>=0.4 and accuracy<0.5:
+			gradient_score_list_gap_list[4] += gradient_score_list
+		elif accuracy>=0.5 and accuracy<0.6:
+			gradient_score_list_gap_list[5] += gradient_score_list
+		elif accuracy>=0.6 and accuracy<0.7:
+			gradient_score_list_gap_list[6] += gradient_score_list
+		elif accuracy>=0.7 and accuracy<0.8:
+			gradient_score_list_gap_list[7] += gradient_score_list
+		elif accuracy>=0.8 and accuracy<0.9:
+			gradient_score_list_gap_list[8] += gradient_score_list
+		elif accuracy>=0.9 and accuracy<=1.0:
+			gradient_score_list_gap_list[9] += gradient_score_list
+	return gradient_score_list_gap_list
 
 def get_gene_set_given_mcl_id_ls(mcl_id_list, input_fname, acc_cut_off=0.6, hostname='zhoudb', dbname='graphdb', schema='hs_fim_40'):
 	import csv, sys, os
