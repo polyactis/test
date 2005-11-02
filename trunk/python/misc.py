@@ -1596,6 +1596,7 @@ def write_gene_incidence_matrix(dir, output_dir, hostname='zhoudb', dbname='grap
 	convert the incidence matrix into a jpeg file
 09-26-05
 	This part has been ported to DrawGenePresenceMatrix.py
+10-31-05 ported to codense/common.py
 """
 import Image, ImageDraw
 def get_char_dimension():
@@ -1705,6 +1706,7 @@ def cor_sig_subset(old_datasets_mapping, new_datasets_mapping, old_schema, old_s
 """
 09-26-05
 	draw a function vs condition 2D map
+10-31-05 ported to DrawMaps.py
 """
 def draw_function_map(good_cluster_table, output_fname, hostname='zhoudb', dbname='graphdb', schema='mm_fim_97'):
 	import sys, os, Image, ImageDraw
@@ -2148,8 +2150,416 @@ def p_gene_table_transfer_given_p_gene_id_set(old_p_gene_table, new_p_gene_table
 		rows = curs.fetchall()
 	curs.execute("end")
 	del conn, curs
+
+"""
+10-30-05
+	step 1: find_low_density_pattern()
+		low_density_pattern: no_of_edges = no_of_vertices-1
+	step 2: filter_low_density_pattern()
+		one d_row in d_matrix should be = range(no_of_vertices)
+"""
+def find_low_density_pattern(curs, good_cluster_table, schema='hs_fim_92'):
+	import sys,os
+	from sets import Set
+	curs.execute("set search_path to %s"%schema)
+	curs.execute("DECLARE crs CURSOR FOR SELECT mcl_id, recurrence, connectivity, \
+		size, go_no_list from %s"%good_cluster_table)
+	curs.execute("fetch 5000 from crs")
+	rows = curs.fetchall()
+	ls_to_return = []
+	counter = 0
+	real_counter =0
+	while rows:
+		for row in rows:
+			mcl_id, recurrence, connectivity, size, go_no_list = row
+			go_no_list = go_no_list[1:-1].split(',')
+			go_no_list = map(int, go_no_list)
+			go_no_set = Set(go_no_list)
+			no_of_edges = connectivity*size*(size-1)/2	#this is a float
+			if (size-no_of_edges-1) <0.001 and (size-no_of_edges-1)> -0.001:
+				ls_to_return.append([recurrence, size, mcl_id, go_no_set])
+				real_counter += 1
+			counter += 1
+		sys.stderr.write("%s%s/%s"%('\x08'*20, counter, real_counter))
+		curs.execute("fetch 5000 from crs")
+		rows = curs.fetchall()
+	curs.execute("close crs")
+	ls_to_return.sort()
+	return ls_to_return
+
+def filter_low_density_pattern(input_ls, pattern_table, schema='scfim30'):
+	import sys,os
+	curs.execute("set search_path to %s"%schema)
+	ls_to_return = []
+	for row in input_ls:
+		recurrence, size, mcl_id, go_no_set = row
+		curs.execute("select d_matrix from %s where id=%s"%(pattern_table, mcl_id))
+		rows = curs.fetchall()
+		d_matrix = rows[0][0]
+		d_matrix = d_matrix[2:-2].split('},{')
+		d_row_for_line_pattern = range(size)
+		for d_row in d_matrix:
+			d_row = d_row.split(',')
+			d_row = map(int, d_row)
+			d_row.sort()
+			if d_row == d_row_for_line_pattern:
+				ls_to_return.append(row)
+	return ls_to_return
+
+"""
+10-30-05 try to find a pattern with >=2 distinct function centers
+	patterns_with_multiple_functions() is step 1.
+	filter_patterns_with_m_functions() is step 2.
+"""
+def patterns_with_multiple_functions(curs, good_cluster_table, schema='scfim30'):
+	import sys,os
+	from sets import Set
+	curs.execute("set search_path to %s"%schema)
+	curs.execute("DECLARE crs CURSOR FOR SELECT mcl_id, connectivity, \
+		size, go_no_list from %s"%good_cluster_table)
+	curs.execute("fetch 5000 from crs")
+	rows = curs.fetchall()
+	ls_to_return = []
+	counter = 0
+	real_counter =0
+	while rows:
+		for row in rows:
+			mcl_id, connectivity, size, go_no_list = row
+			go_no_list = go_no_list[1:-1].split(',')
+			go_no_list = map(int, go_no_list)
+			go_no_set = Set(go_no_list)
+			if len(go_no_set)>=2 and size>12:	#
+				ls_to_return.append(row)
+				real_counter += 1
+			counter += 1
+		sys.stderr.write("%s%s/%s"%('\x08'*20, counter, real_counter))
+		curs.execute("fetch 5000 from crs")
+		rows = curs.fetchall()
+	curs.execute("close crs")
+	return ls_to_return
+
+"""
+any two go_no doesn't share word
+"""
+def filter_ls_above(input_ls, curs, schema='scfim30'):
+	from sets import Set
+	import sys, os
+	sys.path += [os.path.expanduser('~/script/annot/bin')]
+	from codense.common import get_go_no2name
+	go_no2name = get_go_no2name(curs)
+	go_no2split_name_set = {}
+	for go_no, name in go_no2name.iteritems():
+		split_name_set = Set(name.split())
+		go_no2split_name_set[go_no] = split_name_set
 	
+	ls_to_return = []
+	for row in input_ls:
+		mcl_id, connectivity, size, go_no_list = row
+		go_no_list = go_no_list[1:-1].split(',')
+		go_no_list = map(int, go_no_list)
+		go_no_set = Set(go_no_list)
+		go_no_list = list(go_no_set)
+		to_break = 0
+		for i in range(len(go_no_list)):
+			for j in range(i, len(go_no_list)):
+				if len(go_no2split_name_set[go_no_list[i]]&go_no2split_name_set[go_no_list[j]])==0:
+					ls_to_return.append([mcl_id, connectivity, size, go_no_set])
+					to_break = 1
+					break
+			if to_break == 1:
+				break
+	return ls_to_return
 	
+"""
+all go_nos don't share word
+"""
+
+def filter_ls_above_2(input_ls, curs, max_bad=1, schema='scfim30'):
+	from sets import Set
+	import sys, os
+	sys.path += [os.path.expanduser('~/script/annot/bin')]
+	from codense.common import get_go_no2name
+	go_no2name = get_go_no2name(curs)
+	go_no2split_name_set = {}
+	for go_no, name in go_no2name.iteritems():
+		split_name_set = Set(name.split())
+		go_no2split_name_set[go_no] = split_name_set
+	
+	ls_to_return = []
+	for row in input_ls:
+		mcl_id, connectivity, size, go_no_list = row
+		go_no_list = go_no_list[1:-1].split(',')
+		go_no_list = map(int, go_no_list)
+		go_no_set = Set(go_no_list)
+		go_no_list = list(go_no_set)
+		to_break = 0
+		bad = 0
+		for i in range(len(go_no_list)):
+			for j in range(i, len(go_no_list)):
+				if len(go_no2split_name_set[go_no_list[i]]&go_no2split_name_set[go_no_list[j]])>0:
+					bad += 1
+		if bad <=max_bad and len(go_no_set)>=2+max_bad:
+			ls_to_return.append([mcl_id, connectivity, size, go_no_set])
+	return ls_to_return
+	
+def filter_by_size(input_ls, min_size, max_size):
+	ls_to_return = []
+	for row in input_ls:
+		mcl_id, connectivity, size, go_no_list = row
+		if size>=min_size and size<=max_size:
+			ls_to_return.append(row)
+	return ls_to_return
+
+def filter_by_function_not(input_ls, given_go_no_set):
+	ls_to_return = []
+	for row in input_ls:
+		mcl_id, connectivity, size, go_no_set = row
+		if len(given_go_no_set&go_no_set)==0:
+			ls_to_return.append(row)
+	return ls_to_return
+
+def filter_by_function_in(input_ls, given_go_no_set):
+	ls_to_return = []
+	for row in input_ls:
+		mcl_id, connectivity, size, go_no_set = row
+		if given_go_no_set&go_no_set==given_go_no_set:
+			ls_to_return.append(row)
+	return ls_to_return
+
+"""
+10-31-05 parse the altsplice files and output id:no_of_splicing_events
+"""
+def altsplice_parse(input_fname, output_fname):
+	import sys, os
+	sys.path += [os.path.expanduser('~/script/transfac/src')]
+	from transfacdb import fasta_block_iterator
+	import cStringIO
+	inf = open(input_fname,'r')
+	outf = open(output_fname, 'w')
+	iter = fasta_block_iterator(inf)
+	for block in iter:
+		block = cStringIO.StringIO(block)
+		header_line = block.readline()
+		ensembl_id = header_line[1:-1]
+		no_of_splicing_events = 0
+		for line in block:
+			if line[:6] == 'Class ':
+				no_of_splicing_events += 1
+			else:
+				break
+		outf.write('%s\t%s\n'%(ensembl_id, no_of_splicing_events))
+	del inf, outf
+
+"""
+10-31-05 parse the ensembl embl format files and get the mapping between ensembl_id and EntrezGene
+	embl_ft_block_iterator
+	get_ensembl_id2EntrezGene()
+"""
+class embl_ft_block_iterator:
+	'''
+	10-31-05 embl format FT block iterator.(similar to fasta_block_iterator)
+		1. begin with 'FT'
+		2. the first line of the block, position 5 contains gene, mRNA, CDS or misc_RNA
+	'''
+	def __init__(self, inf):
+		self.inf = inf
+		self.block = ''
+		self.previous_line = ''
+	def __iter__(self):
+		return self
+	def next(self):
+		self.read()
+		return self.block
+	def read(self):
+		self.block = self.previous_line	#don't forget the starting line
+		for line in self.inf:
+			if line[:2] == 'FT':
+				feature_key = line[5:]
+				if feature_key.find('gene')==0 or feature_key.find('mRNA')==0 or \
+					feature_key.find('CDS')==0 or feature_key.find('misc_RNA')==0:
+					self.previous_line = line
+					if self.block:	#not the first time
+						break
+					else:	#first time to read the file, block is still empty
+						self.block += line
+				else:
+					self.block += line
+		if self.block==self.previous_line:
+			raise StopIteration
+
+def get_ensembl_id2EntrezGene(input_dir, output_fname):
+	import sys, os, gzip, cStringIO
+	files = os.listdir(input_dir)
+	outf = open(output_fname, 'w')
+	sys.stderr.write("\tTotally, %d files to be processed.\n"%len(files))
+	for f in files:
+		pathname = os.path.join(input_dir, f)
+		sys.stderr.write("%d/%d:\t%s\n"%(files.index(f)+1,len(files),f))
+		inf = gzip.open(pathname,'r')
+		iter = embl_ft_block_iterator(inf)
+		for block in iter:
+			ensembl_id = ''
+			block = cStringIO.StringIO(block)
+			block.readline()	#discard firstline
+			for line in block:
+				qualifier_line = line[21:]
+				if qualifier_line.find('/gene=')==0:	#eg: /gene=ENSMUSG00000069462 or /gene="ENSMUSG00000069462"
+					ensembl_id = qualifier_line[6:-1]	#discard the newline
+					#when it's 'gene' FT, there's no '"'
+					if ensembl_id[0]=='"':
+						ensembl_id = ensembl_id[1:]
+					if ensembl_id[-1] == '"':
+						ensembl_id = ensembl_id[:-1]
+				if ensembl_id and qualifier_line.find('/db_xref="EntrezGene:')==0:	#eg: /db_xref="EntrezGene:385528"\n
+					EntrezGene_id = qualifier_line[21:-2]	#discard the new line and double quote
+					outf.write('%s\t%s\n'%(ensembl_id, EntrezGene_id))
+		del inf
+	del outf
+
+"""
+11-01-05 filter cluster_bs_table
+"""
+def filter_cluster_bs_table(curs, cluster_bs_table, output_table, top_number, commit=0):
+	import sys,os
+	sys.path += [os.path.expanduser('~/script/annot/bin')]
+	from TF_functions import hq_add
+	from heapq import heappush, heappop, heapreplace
+	
+	score_id_hq = []
+	mcl_id_no_of_bs2frequency = {}
+	curs.execute("DECLARE crs CURSOR FOR select id,score,mcl_id,array_upper(bs_no_list,1)  from %s where \
+		score_type=1"%(cluster_bs_table))
+	curs.execute("fetch 5000 from crs")
+	rows = curs.fetchall()
+	counter = 1
+	while rows:
+		for row in rows:
+			id, score, mcl_id, no_of_bs = row
+			key = (mcl_id, no_of_bs)
+			if key not in mcl_id_no_of_bs2frequency:
+				mcl_id_no_of_bs2frequency[key] = 0
+			mcl_id_no_of_bs2frequency[key] += 1
+			if mcl_id_no_of_bs2frequency[key]<=2: #just take top 2 for each type and each mcl_id
+				hq_add(score_id_hq, [-score, id, mcl_id], top_number)	#WATCH: min_heap, minus ahead
+			counter += 1
+		sys.stderr.write("%s%s"%('\x08'*20, counter))
+		curs.execute("fetch 5000 from crs")
+		rows = curs.fetchall()
+	curs.execute("close crs")
+	
+	curs.execute("create table %s(\
+		id	serial primary key,\
+		cluster_bs_id	integer,\
+		mcl_id integer)"%(output_table))
+	
+	while score_id_hq:
+		score, id, mcl_id = heappop(score_id_hq)
+		score = -score
+		curs.execute("insert into %s(cluster_bs_id, mcl_id) values(%s, %s)"%(output_table, id, mcl_id))
+	if commit:
+		curs.execute("end")
+
+"""
+11-01-05 get the average no_of_events (alternative splicing) for each no_of_p_funcs2gene_set.
+"""
+def pleiotropy2as(picklefile, gene_no2no_of_events):
+	import cPickle
+	no_of_p_funcs2gene_set = cPickle.load(open(picklefile))
+	no_of_p_funcs2avg_events = {}
+	max_no_of_p_funcs = 0
+	for no_of_p_funcs, gene_set in no_of_p_funcs2gene_set.iteritems():
+		if no_of_p_funcs>max_no_of_p_funcs:
+			max_no_of_p_funcs = no_of_p_funcs
+		events_ls = []
+		for gene_no in gene_set:
+			if gene_no in gene_no2no_of_events:
+				events_ls.append(gene_no2no_of_events[gene_no])
+			else:
+				events_ls.append(1)
+		avg_events = sum(events_ls)/float(len(events_ls))
+		no_of_p_funcs2avg_events[no_of_p_funcs] = avg_events
+	
+	avg_events_vs_no_of_p_funcs = [0]*max_no_of_p_funcs
+	for no_of_p_funcs, avg_events in no_of_p_funcs2avg_events.iteritems():
+		avg_events_vs_no_of_p_funcs[no_of_p_funcs-1] = avg_events
+	return avg_events_vs_no_of_p_funcs
+
 if __name__ == '__main__':
-	import sys
-	edge_table_from_old_schema(sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], int(sys.argv[5]), commit=int(sys.argv[6]))
+	
+	import sys,os
+	sys.path += [os.path.expanduser('~/script/annot/bin')]
+	from codense.common import db_connect, form_schema_tables
+	hostname='zhoudb'
+	dbname='graphdb'
+	
+	
+	if len(sys.argv)==1:
+		print "Usage: misc.py schema picklefile"
+		sys.exit(0)
+	schema, picklefile =  sys.argv[1:]
+	from codense.common import get_gene_no2no_of_events
+	conn, curs = db_connect(hostname, dbname, schema)
+	gene_no2no_of_events = get_gene_no2no_of_events(curs)
+	avg_events_vs_no_of_p_funcs = pleiotropy2as(picklefile, gene_no2no_of_events)
+	print avg_events_vs_no_of_p_funcs
+	
+	#11-01-05 following is used to filter cluster_bs_table
+	"""
+	if len(sys.argv)==1:
+		print "Usage: misc.py schema input_fname lm_bit acc_cut_off top_number commit_bit"
+		sys.exit(0)
+	schema, input_fname, lm_bit, acc_cut_off, top_number, commit_bit = sys.argv[1:]
+	acc_cut_off = float(acc_cut_off)
+	top_number = int(top_number)
+	commit_bit = int(commit_bit)
+	schema_instance = form_schema_tables(input_fname, acc_cut_off, lm_bit)
+	conn, curs = db_connect(hostname, dbname, schema)
+	filter_cluster_bs_table(curs, schema_instance.cluster_bs_table, schema_instance.good_bs_table, top_number, commit_bit)
+	"""
+	###10-31-05 following is for global pleiotropy of one prediciton setting
+	"""
+	import sys,os
+	sys.path += [os.path.expanduser('~/script/annot/bin')]
+	from codense.common import db_connect, p_gene_id_src_set_from_gene_p_table,\
+		get_gene_no2p_go_no_set_given_p_gene_id_set, form_schema_tables, p_gene_id_set_from_gene_p_table
+	hostname='zhoudb'
+	dbname='graphdb'
+	if len(sys.argv)==1:
+		print "Usage: misc.py schema input_fname lm_bit acc_cut_off type outputfname"
+		print "type: 0(redundant), 1(non-redundant)"
+		sys.exit(0)
+	
+	schema, input_fname, lm_bit, acc_cut_off, type, outputfname = sys.argv[1:]
+	acc_cut_off = float(acc_cut_off)
+	type = int(type)
+	conn, curs = db_connect(hostname, dbname, schema)
+	schema_instance = form_schema_tables(input_fname, acc_cut_off, lm_bit)
+	if type==0:
+		p_gene_id_src_set = p_gene_id_set_from_gene_p_table(curs, schema_instance.gene_p_table)
+	else:
+		p_gene_id_src_set = p_gene_id_src_set_from_gene_p_table(curs, schema_instance.gene_p_table)
+	gene_no2p_go_no_set 	= get_gene_no2p_go_no_set_given_p_gene_id_set(curs, \
+		schema_instance.p_gene_table, p_gene_id_src_set, report=1)
+	"""
+	"""
+	#10-31-05 following is for histogram drawing
+	no_of_genes_vs_no_of_p_funcs = []	#index is no_of_p_funcs, value is no_of_genes, like histogram
+	for gene_no, p_go_no_set in gene_no2p_go_no_set.iteritems():
+		no_of_p_funcs = len(p_go_no_set)
+		current_length = len(no_of_genes_vs_no_of_p_funcs)
+		if no_of_p_funcs>current_length:
+			no_of_genes_vs_no_of_p_funcs += [0]*(no_of_p_funcs-current_length)
+		no_of_genes_vs_no_of_p_funcs[no_of_p_funcs-1] += 1
+	print no_of_genes_vs_no_of_p_funcs
+	"""
+	"""
+	#following stuff dumps the object into a picklefile
+	no_of_p_funcs2no_of_genes = {}
+	for gene_no, p_go_no_set in gene_no2p_go_no_set.iteritems():
+		no_of_p_funcs = len(p_go_no_set)
+		if no_of_p_funcs not in no_of_p_funcs2no_of_genes:
+			no_of_p_funcs2no_of_genes[no_of_p_funcs] = Set()
+		no_of_p_funcs2no_of_genes[no_of_p_funcs].add(gene_no)
+	import cPickle
+	cPickle.dump(no_of_p_funcs2no_of_genes, open(outputfname, 'w'))
+	"""
