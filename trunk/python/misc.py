@@ -2484,6 +2484,67 @@ def pleiotropy2as(picklefile, gene_no2no_of_events):
 		avg_events_vs_no_of_p_funcs[no_of_p_funcs-1] = avg_events
 	return avg_events_vs_no_of_p_funcs
 
+"""
+11-02-05 find patterns from good_cluster_table given a go_no_set and output them
+"""
+def find_patterns_given_go_no_set(curs, schema_instance, given_go_no_set, pic_output_dir):
+	import sys, os
+	sys.path += [os.path.expanduser('~/script/annot/bin')]
+	from sets import Set
+	from codense.common import get_gene_no2gene_id, get_gene_no2go_no
+	from cluster_info import cluster_info	#transform vertex_set and edge_set into subgraph
+	from codense.common import system_call, graphDotOutput
+	
+	gene_no2gene_id = get_gene_no2gene_id(curs)
+	gene_no2go_no = get_gene_no2go_no(curs)
+	
+	cluster_info_instance = cluster_info()
+	
+	curs.execute("DECLARE crs CURSOR FOR select mcl_id, go_no_list from %s"%schema_instance.good_cluster_table)
+	curs.execute("fetch 10000 from crs")
+	rows = curs.fetchall()
+	counter = 0
+	real_counter = 0
+	while rows:
+		for row in rows:
+			mcl_id, go_no_list = row
+			go_no_list = go_no_list[1:-1].split(',')
+			go_no_list = map(int, go_no_list)
+			go_no_set = Set(go_no_list)
+			join_go_no_set = go_no_set&given_go_no_set
+			if join_go_no_set:
+				curs.execute("select vertex_set, edge_set from %s where id=%s"%(schema_instance.pattern_table,mcl_id))
+				rows = curs.fetchall()
+				
+				#draw graph
+				vertex_set, edge_set = rows[0]
+				vertex_set = vertex_set[1:-1].split(',')
+				vertex_set = map(int, vertex_set)
+				edge_set = edge_set[2:-2].split('},{')
+				for i in range(len(edge_set)):
+					edge_set[i] = edge_set[i].split(',')
+					edge_set[i] = map(int, edge_set[i])
+				#following copied from GuiAnalyzer.py
+				for go_no in join_go_no_set:
+					subgraph = cluster_info_instance.graph_from_node_edge_set(vertex_set, edge_set)
+					graphSrcFname = '/tmp/GuiAnalyzer.dot'
+					graphFname = os.path.join(pic_output_dir, '%s_%s.png'%(go_no, mcl_id))
+					graphSrcF = open(graphSrcFname, 'w')
+					graphDotOutput(graphSrcF, subgraph, gene_no2gene_id, gene_no2go_no, \
+						function=go_no, weighted=0)
+					graphSrcF.close()
+					plot_type_command='neato -Goverlap=false'
+					commandline = '%s -Tpng %s -o %s'%(plot_type_command, graphSrcFname, graphFname)
+					system_call(commandline)
+				real_counter += 1
+				
+			counter += 1
+		sys.stderr.write("%s%s/%s"%('\x08'*20, counter, real_counter))
+		curs.execute("fetch 10000 from crs")
+		rows = curs.fetchall()
+	curs.execute("close crs")
+
+
 if __name__ == '__main__':
 	
 	import sys,os
@@ -2491,8 +2552,23 @@ if __name__ == '__main__':
 	from codense.common import db_connect, form_schema_tables
 	hostname='zhoudb'
 	dbname='graphdb'
+	if len(sys.argv)==1:
+		print "Usage: misc.py schema input_fname lm_bit acc_cut_off given_go_no_list pic_output_dir"
+		sys.exit(0)
+	schema, input_fname, lm_bit, acc_cut_off, given_go_no_list, pic_output_dir = sys.argv[1:]
+	acc_cut_off = float(acc_cut_off)
+	given_go_no_list = given_go_no_list.split(',')
+	given_go_no_list = map(int, given_go_no_list)
+	from sets import Set
+	given_go_no_set = Set(given_go_no_list)
+	
+	schema_instance = form_schema_tables(input_fname, acc_cut_off, lm_bit)
+	conn, curs = db_connect(hostname, dbname, schema)
+	find_patterns_given_go_no_set(curs, schema_instance, given_go_no_set, pic_output_dir)
 	
 	
+	#11-02-05 following is to give pleiotropy overview(AS events)
+	"""
 	if len(sys.argv)==1:
 		print "Usage: misc.py schema picklefile"
 		sys.exit(0)
@@ -2502,6 +2578,7 @@ if __name__ == '__main__':
 	gene_no2no_of_events = get_gene_no2no_of_events(curs)
 	avg_events_vs_no_of_p_funcs = pleiotropy2as(picklefile, gene_no2no_of_events)
 	print avg_events_vs_no_of_p_funcs
+	"""
 	
 	#11-01-05 following is used to filter cluster_bs_table
 	"""
