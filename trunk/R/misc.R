@@ -31,3 +31,8 @@ draw_multiple_panel2 <- function(filename)
 	data = read.table(filename,header=TRUE)
 	xyplot(acc1~parameter2|parameter1,data=data, col="black")
 }
+
+#11-10-05 rpart
+library(rpart)
+fit = rpart(is_correct~p_value+recurrence+connectivity+cluster_size+gradient, data=data, method="class",
+	control=rpart.control(cp=.00001),parms=list(prior=c(.58,.42))	)
