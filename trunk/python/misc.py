@@ -888,16 +888,17 @@ def gene_no2go_id_set_from_gene_p_given_gene_set(input_fname, gene_set, hostname
 			gene_no2go_id_list[gene_no].add(go_id)
 	return gene_no2go_id_list
 
-def gene_no_go_id_pair_from_gene_p_given_gene_set(input_fname, gene_set, hostname='zhoudb', dbname='graphdb', schema='sc_new_38'):
+def gene_no_go_id_pair_from_gene_p_given_gene_set(input_fname, gene_set, hostname='zhoudb', \
+	dbname='graphdb', schema='sc_new_38', lm_bit='00001'):
 	from sets import Set
+	import sys,os
+	sys.path += [os.path.expanduser('~/script/annot/bin')]
+	from codense.common import db_connect, form_schema_tables
+	schema_instance = form_schema_tables(input_fname, lm_bit)
 	gene_no2go_id_set = Set()
-	p_gene_table = "p_gene_%s_e5"%input_fname
-	gene_p_table = "gene_p_%s_e5_p01"%input_fname
-	from codense.common import db_connect
-	import psycopg
 	conn, curs = db_connect(hostname, dbname, schema)
 	curs.execute("select p.gene_no,go.go_id from %s p, %s g, go where p.p_gene_id=g.p_gene_id and go.go_no =p.go_no"%\
-		(p_gene_table, gene_p_table))
+		(schema_instance.p_gene_table, schema_instance.gene_p_table))
 	rows = curs.fetchall()
 	for row in rows:
 		gene_no = row[0]
@@ -905,7 +906,26 @@ def gene_no_go_id_pair_from_gene_p_given_gene_set(input_fname, gene_set, hostnam
 		if gene_no in gene_set:
 			gene_no2go_id_set.add((gene_no,go_id))
 	return gene_no2go_id_set
-	
+"""
+11-10-05
+"""
+def gene_no_go_no_pair_from_gene_p_table(input_fname, hostname='zhoudb', \
+	dbname='graphdb', schema='sc_new_38', lm_bit='00001'):
+	from sets import Set
+	import sys,os
+	sys.path += [os.path.expanduser('~/script/annot/bin')]
+	from codense.common import db_connect, form_schema_tables
+	schema_instance = form_schema_tables(input_fname, lm_bit=lm_bit)
+	gene_no2go_id_set = Set()
+	conn, curs = db_connect(hostname, dbname, schema)
+	curs.execute("select p.gene_no,p.go_no from %s p, %s g  where p.p_gene_id=g.p_gene_id"%\
+		(schema_instance.p_gene_table, schema_instance.gene_p_table))
+	rows = curs.fetchall()
+	for row in rows:
+		gene_no = row[0]
+		go_no = row[1]
+		gene_no2go_id_set.add((gene_no,go_no))
+	return gene_no2go_id_set	
 """
 06-26-05
 """
@@ -2543,6 +2563,59 @@ def find_patterns_given_go_no_set(curs, schema_instance, given_go_no_set, pic_ou
 		curs.execute("fetch 10000 from crs")
 		rows = curs.fetchall()
 	curs.execute("close crs")
+
+
+"""11-09-05 for rpart"""
+def read_data(inputfile):
+	import csv
+	from numarray import array
+	reader = csv.reader(open(inputfile), delimiter='\t')
+	print reader.next()
+	data = []
+	for row in reader:
+		p_value,recurrence,connectivity,cluster_size,connectivity_2nd,gene_no,go_no,is_correct = row
+		row[0] = float(row[0])
+		row[1] = float(row[1])
+		row[2] = float(row[2])
+		row[3] = int(float(row[3]))
+		row[4] = float(row[4])
+		row[5] = int(float(row[5]))
+		row[6] = int(float(row[6]))
+		row[-1] = int(float(row[-1]))
+		data.append(row)
+	data = array(data)
+	del reader
+	return data
+	
+def take_top_data(inputfile, outputfile):
+	prediction2attr= {}
+	reader = csv.reader(open(inputfile),delimiter='\t')
+	reader.next()	#skip the header
+	for row in reader:
+		p_value,recurrence,connectivity,cluster_size,connectivity_2nd,gene_no,go_no,is_correct = row
+		prediction_pair = (gene_no,go_no)
+		attr = row
+		if prediction_pair not in prediction2attr:
+			prediction2attr[prediction_pair] = attr
+		else:
+			if attr[1]> prediction2attr[prediction_pair][1]:
+				prediction2attr[prediction_pair] = attr
+	writer = csv.writer(open(outputfile,'w'),delimiter='\t')
+	writer.writerow(['p_value','recurrence','connectivity','cluster_size','connectivity_2nd','gene_no','go_no','is_correct'])
+	for prediction_pair,attr in prediction2attr.iteritems():
+		writer.writerow(attr)
+	del reader, writer
+
+def rpart_fit_and_prediction(data):
+	from rpy import r, set_default_mode,NO_CONVERSION,BASIC_CONVERSION
+	formula_list = ['p_value', 'recurrence', 'connectivity', 'cluster_size', 'connectivity_2nd']
+	set_default_mode(NO_CONVERSION) #04-07-05
+	data_frame = r.as_data_frame({"p_value":data[:,0], "recurrence":data[:,1], "connectivity":data[:,2], \
+		"cluster_size":data[:,3], "connectivity_2nd":data[:,4], "is_correct":data[:,-1]})
+	fit = r.rpart(r("is_correct~%s"%'+'.join(formula_list)), data=data_frame, method="class")
+	set_default_mode(BASIC_CONVERSION) #04-07-05
+	pred = r.predict(fit, data_frame)
+	return pred
 
 
 if __name__ == '__main__':
