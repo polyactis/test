@@ -888,17 +888,16 @@ def gene_no2go_id_set_from_gene_p_given_gene_set(input_fname, gene_set, hostname
 			gene_no2go_id_list[gene_no].add(go_id)
 	return gene_no2go_id_list
 
-def gene_no_go_id_pair_from_gene_p_given_gene_set(input_fname, gene_set, hostname='zhoudb', \
-	dbname='graphdb', schema='sc_new_38', lm_bit='00001'):
+def gene_no_go_id_pair_from_gene_p_given_gene_set(input_fname, gene_set, hostname='zhoudb', dbname='graphdb', schema='sc_new_38'):
 	from sets import Set
-	import sys,os
-	sys.path += [os.path.expanduser('~/script/annot/bin')]
-	from codense.common import db_connect, form_schema_tables
-	schema_instance = form_schema_tables(input_fname, lm_bit)
 	gene_no2go_id_set = Set()
+	p_gene_table = "p_gene_%s_e5"%input_fname
+	gene_p_table = "gene_p_%s_e5_p01"%input_fname
+	from codense.common import db_connect
+	import psycopg
 	conn, curs = db_connect(hostname, dbname, schema)
 	curs.execute("select p.gene_no,go.go_id from %s p, %s g, go where p.p_gene_id=g.p_gene_id and go.go_no =p.go_no"%\
-		(schema_instance.p_gene_table, schema_instance.gene_p_table))
+		(p_gene_table, gene_p_table))
 	rows = curs.fetchall()
 	for row in rows:
 		gene_no = row[0]
@@ -906,26 +905,7 @@ def gene_no_go_id_pair_from_gene_p_given_gene_set(input_fname, gene_set, hostnam
 		if gene_no in gene_set:
 			gene_no2go_id_set.add((gene_no,go_id))
 	return gene_no2go_id_set
-"""
-11-10-05
-"""
-def gene_no_go_no_pair_from_gene_p_table(input_fname, hostname='zhoudb', \
-	dbname='graphdb', schema='sc_new_38', lm_bit='00001'):
-	from sets import Set
-	import sys,os
-	sys.path += [os.path.expanduser('~/script/annot/bin')]
-	from codense.common import db_connect, form_schema_tables
-	schema_instance = form_schema_tables(input_fname, lm_bit=lm_bit)
-	gene_no2go_id_set = Set()
-	conn, curs = db_connect(hostname, dbname, schema)
-	curs.execute("select p.gene_no,p.go_no from %s p, %s g  where p.p_gene_id=g.p_gene_id"%\
-		(schema_instance.p_gene_table, schema_instance.gene_p_table))
-	rows = curs.fetchall()
-	for row in rows:
-		gene_no = row[0]
-		go_no = row[1]
-		gene_no2go_id_set.add((gene_no,go_no))
-	return gene_no2go_id_set	
+	
 """
 06-26-05
 """
@@ -2564,59 +2544,91 @@ def find_patterns_given_go_no_set(curs, schema_instance, given_go_no_set, pic_ou
 		rows = curs.fetchall()
 	curs.execute("close crs")
 
-
-"""11-09-05 for rpart"""
-def read_data(inputfile):
+"""
+11-16-05
+	to confirm Fei's hypergeometric p-value on two clusters. See his 11/14/05 email.
+"""
+def get_gene_no_set_from_fei_file(input_fname):
 	import csv
-	from numarray import array
-	reader = csv.reader(open(inputfile), delimiter='\t')
-	print reader.next()
-	data = []
+	from sets import Set
+	reader = csv.reader(open(input_fname))
+	gene_no_set = Set()
 	for row in reader:
-		p_value,recurrence,connectivity,cluster_size,connectivity_2nd,gene_no,go_no,is_correct = row
-		row[0] = float(row[0])
-		row[1] = float(row[1])
-		row[2] = float(row[2])
-		row[3] = int(float(row[3]))
-		row[4] = float(row[4])
-		row[5] = int(float(row[5]))
-		row[6] = int(float(row[6]))
-		row[-1] = int(float(row[-1]))
-		data.append(row)
-	data = array(data)
-	del reader
-	return data
+		gene_no = int(row[0])
+		gene_no_set.add(gene_no)
+	return gene_no_set
 	
-def take_top_data(inputfile, outputfile):
-	prediction2attr= {}
-	reader = csv.reader(open(inputfile),delimiter='\t')
-	reader.next()	#skip the header
+def get_go_no2gene_no_set_from_fei_file(input_fname, gene_no_set):
+	from sets import Set
+	inf = open(input_fname)
+	#skip the first line
+	inf.readline()
+	import csv
+	reader = csv.reader(inf, delimiter=';')
+	go_no2gene_no_set = {}
+	gene_no2go_no_set = {}
 	for row in reader:
-		p_value,recurrence,connectivity,cluster_size,connectivity_2nd,gene_no,go_no,is_correct = row
-		prediction_pair = (gene_no,go_no)
-		attr = row
-		if prediction_pair not in prediction2attr:
-			prediction2attr[prediction_pair] = attr
-		else:
-			if attr[1]> prediction2attr[prediction_pair][1]:
-				prediction2attr[prediction_pair] = attr
-	writer = csv.writer(open(outputfile,'w'),delimiter='\t')
-	writer.writerow(['p_value','recurrence','connectivity','cluster_size','connectivity_2nd','gene_no','go_no','is_correct'])
-	for prediction_pair,attr in prediction2attr.iteritems():
-		writer.writerow(attr)
-	del reader, writer
+		gene_no, go_no = row
+		gene_no = int(gene_no)
+		if gene_no in gene_no_set:
+			if go_no not in go_no2gene_no_set:
+				go_no2gene_no_set[go_no]  = Set()
+			go_no2gene_no_set[go_no].add(gene_no)
+			if gene_no not in gene_no2go_no_set:
+				gene_no2go_no_set[gene_no] = Set()
+			gene_no2go_no_set[gene_no].add(go_no)
+	del reader, inf
+	return go_no2gene_no_set, gene_no2go_no_set
 
-def rpart_fit_and_prediction(data):
-	from rpy import r, set_default_mode,NO_CONVERSION,BASIC_CONVERSION
-	formula_list = ['p_value', 'recurrence', 'connectivity', 'cluster_size', 'connectivity_2nd']
-	set_default_mode(NO_CONVERSION) #04-07-05
-	data_frame = r.as_data_frame({"p_value":data[:,0], "recurrence":data[:,1], "connectivity":data[:,2], \
-		"cluster_size":data[:,3], "connectivity_2nd":data[:,4], "is_correct":data[:,-1]})
-	fit = r.rpart(r("is_correct~%s"%'+'.join(formula_list)), data=data_frame, method="class")
-	set_default_mode(BASIC_CONVERSION) #04-07-05
-	pred = r.predict(fit, data_frame)
-	return pred
+def cal_all_p_values(vertex_list, no_of_total_genes, go_no2gene_no_set, gene_no2go_no_set, debug=0):
+	from sets import Set
+	from rpy import r
+	local_go_no2no_of_genes = {}
+	for vertex in vertex_list:
+		for go_no in gene_no2go_no_set[vertex]:
+			if go_no not in local_go_no2no_of_genes:
+				local_go_no2no_of_genes[go_no] = 0
+			local_go_no2no_of_genes[go_no] += 1
+	
+	p_value_go_no_list = []
+	cluster_size = len(vertex_list)
+	for go_no, no_of_genes in local_go_no2no_of_genes.iteritems():
+		x = no_of_genes
+		m = len(go_no2gene_no_set[go_no])
+		n = no_of_total_genes - cluster_size
+		k = cluster_size
+		
+		if debug:
+			print "x",x
+			print "m",m
+			print "n",n
+			print "k", k
+		
+		p_value = r.phyper(x-1,m,n,k,lower_tail = r.FALSE)
+		p_value_go_no_list.append([p_value, go_no])
+	return p_value_go_no_list
+	
+	
 
+"""
+11-16-05
+"""
+def output_ls_in_stx_table_format(ls, row_length):
+	"""
+	one dimension
+	"""
+	row_delimiter =  '|'+'-'*row_length+'|'
+	print row_delimiter
+	for item in ls:
+		print '|' + item.ljust(row_length) + '|'
+		print row_delimiter
+
+def output_2d_ls_in_stx_table_format(ls, row_length_ls):
+	row_delimiter =  '|'+'-'*row_length_ls[0]+'|'+'-'*row_length_ls[1]+'|'
+	print row_delimiter
+	for item in ls:
+		print '|' + item[0].ljust(row_length_ls[0]) + '|' + repr(item[1]).ljust(row_length_ls[1]) + '|'
+		print row_delimiter
 
 if __name__ == '__main__':
 	
