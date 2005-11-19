@@ -2595,7 +2595,7 @@ def cal_all_p_values(vertex_list, no_of_total_genes, go_no2gene_no_set, gene_no2
 	for go_no, no_of_genes in local_go_no2no_of_genes.iteritems():
 		x = no_of_genes
 		m = len(go_no2gene_no_set[go_no])
-		n = no_of_total_genes - cluster_size
+		n = no_of_total_genes - m	#11-18-05 fix a bug here
 		k = cluster_size
 		
 		if debug:
