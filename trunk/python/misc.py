@@ -2630,6 +2630,61 @@ def output_2d_ls_in_stx_table_format(ls, row_length_ls):
 		print '|' + item[0].ljust(row_length_ls[0]) + '|' + repr(item[1]).ljust(row_length_ls[1]) + '|'
 		print row_delimiter
 
+"""
+11-19-05
+"""
+def get_unknown_gene_set_from_p_gene_table_vg_1(curs, p_gene_table):
+	from sets import Set
+	curs.execute("DECLARE crs CURSOR FOR select gene_no from %s where vertex_gradient=1 \
+		and is_correct_lca=-1"%(p_gene_table))
+	curs.execute("fetch 5000 from crs")
+	rows = curs.fetchall()
+	gene_set = Set()
+	while rows:
+		for row in rows:
+			gene_set.add(row[0])
+		curs.execute("fetch 5000 from crs")
+		rows = curs.fetchall()
+	curs.execute('close crs')
+	return gene_set
+
+def unknown_gene_set_from_gene_p_table(curs, p_gene_table, gene_p_table):
+	from sets import Set
+	from codense.common import db_connect
+	gene_set = Set()
+	#first get all good p_gene_id's
+	curs.execute("DECLARE crs CURSOR FOR select p_gene_id from %s"%gene_p_table)
+	curs.execute("fetch 5000 from crs")
+	rows = curs.fetchall()
+	p_gene_id_set  = Set()
+	counter  =0
+	while rows:
+		for  row in rows:
+			p_gene_id_set.add(row[0])
+			counter += 1
+		sys.stderr.write('%s%s'%('\x08'*20,counter))
+		curs.execute("fetch 5000 from crs")
+		rows = curs.fetchall()
+	curs.execute('close crs')
+	
+	curs.execute("DECLARE crs CURSOR FOR select p.p_gene_id, p.gene_no,p.is_correct_lca from %s p"%\
+		(p_gene_table))
+	curs.execute("fetch 5000 from crs")
+	rows = curs.fetchall()
+	counter = 0
+	while rows:
+		for row in rows:
+			p_gene_id, gene_no, is_correct_lca= row
+			if p_gene_id in p_gene_id_set and is_correct_lca==-1:
+				gene_set.add(gene_no)
+			counter += 1
+		sys.stderr.write('%s%s'%('\x08'*20,counter))
+		curs.execute("fetch 5000 from crs")
+		rows = curs.fetchall()
+	curs.execute('close crs')
+	
+	return gene_set
+
 if __name__ == '__main__':
 	
 	import sys,os
