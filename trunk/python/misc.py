@@ -1280,6 +1280,13 @@ def hist_plot_list(input_list):
 	r.hist(input_list,main='histogram',xlab='something',ylab='freq')
 	return None
 
+#11-27-05
+def plot_ls(input_list):
+	from rpy import r
+	x_list = range(len(input_list))
+	r.plot(x_list, input_list, main='plot',xlab='index',ylab='value', type='b')
+	return None
+
 """
 07-29-05
 """
@@ -2684,6 +2691,18 @@ def unknown_gene_set_from_gene_p_table(curs, p_gene_table, gene_p_table):
 	curs.execute('close crs')
 	
 	return gene_set
+"""
+11-27-05
+"""
+def get_gene2freq_from_prediction_pair2freq(prediciton_pair2freq):
+	gene2freq = {}
+	for prediciton_pair, freq in prediciton_pair2freq.iteritems():
+		gene_no, go_no = prediciton_pair
+		if gene_no not in gene2freq:
+			gene2freq[gene_no] = 0
+		if freq>gene2freq[gene_no]:
+			gene2freq[gene_no] = freq
+	return gene2freq
 
 if __name__ == '__main__':
 	
