@@ -2711,6 +2711,8 @@ if __name__ == '__main__':
 	from codense.common import db_connect, form_schema_tables
 	hostname='zhoudb'
 	dbname='graphdb'
+	#### following codes find patterns given go_no_list
+	"""
 	if len(sys.argv)==1:
 		print "Usage: misc.py schema input_fname lm_bit acc_cut_off given_go_no_list pic_output_dir"
 		sys.exit(0)
@@ -2724,10 +2726,10 @@ if __name__ == '__main__':
 	schema_instance = form_schema_tables(input_fname, acc_cut_off, lm_bit)
 	conn, curs = db_connect(hostname, dbname, schema)
 	find_patterns_given_go_no_set(curs, schema_instance, given_go_no_set, pic_output_dir)
-	
+	"""
 	
 	#11-02-05 following is to give pleiotropy overview(AS events)
-	"""
+	
 	if len(sys.argv)==1:
 		print "Usage: misc.py schema picklefile"
 		sys.exit(0)
@@ -2737,7 +2739,7 @@ if __name__ == '__main__':
 	gene_no2no_of_events = get_gene_no2no_of_events(curs)
 	avg_events_vs_no_of_p_funcs = pleiotropy2as(picklefile, gene_no2no_of_events)
 	print avg_events_vs_no_of_p_funcs
-	"""
+	
 	
 	#11-01-05 following is used to filter cluster_bs_table
 	"""
@@ -2752,6 +2754,7 @@ if __name__ == '__main__':
 	conn, curs = db_connect(hostname, dbname, schema)
 	filter_cluster_bs_table(curs, schema_instance.cluster_bs_table, schema_instance.good_bs_table, top_number, commit_bit)
 	"""
+	
 	###10-31-05 following is for global pleiotropy of one prediciton setting
 	"""
 	import sys,os
@@ -2776,8 +2779,8 @@ if __name__ == '__main__':
 		p_gene_id_src_set = p_gene_id_src_set_from_gene_p_table(curs, schema_instance.gene_p_table)
 	gene_no2p_go_no_set 	= get_gene_no2p_go_no_set_given_p_gene_id_set(curs, \
 		schema_instance.p_gene_table, p_gene_id_src_set, report=1)
-	"""
-	"""
+	
+	
 	#10-31-05 following is for histogram drawing
 	no_of_genes_vs_no_of_p_funcs = []	#index is no_of_p_funcs, value is no_of_genes, like histogram
 	for gene_no, p_go_no_set in gene_no2p_go_no_set.iteritems():
@@ -2787,8 +2790,8 @@ if __name__ == '__main__':
 			no_of_genes_vs_no_of_p_funcs += [0]*(no_of_p_funcs-current_length)
 		no_of_genes_vs_no_of_p_funcs[no_of_p_funcs-1] += 1
 	print no_of_genes_vs_no_of_p_funcs
-	"""
-	"""
+	
+	
 	#following stuff dumps the object into a picklefile
 	no_of_p_funcs2no_of_genes = {}
 	for gene_no, p_go_no_set in gene_no2p_go_no_set.iteritems():
