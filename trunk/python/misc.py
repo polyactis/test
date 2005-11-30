@@ -2492,6 +2492,31 @@ def pleiotropy2as(picklefile, gene_no2no_of_events):
 	return avg_events_vs_no_of_p_funcs
 
 """
+11-29-05 learn from Kopelman2005, using Fraction AS
+"""
+def pleiotropy2fraction_as(picklefile, gene_no2no_of_events):
+	import cPickle
+	no_of_p_funcs2gene_set = cPickle.load(open(picklefile))
+	no_of_p_funcs2fraction_as = {}
+	max_no_of_p_funcs = 0
+	for no_of_p_funcs, gene_set in no_of_p_funcs2gene_set.iteritems():
+		if no_of_p_funcs>max_no_of_p_funcs:
+			max_no_of_p_funcs = no_of_p_funcs
+		no_of_genes_with_as = 0
+		for gene_no in gene_set:
+			if gene_no in gene_no2no_of_events:
+				if gene_no2no_of_events[gene_no]>=2:	#more than one is counted as having AS
+					no_of_genes_with_as += 1
+		no_of_p_funcs2fraction_as[no_of_p_funcs] = float(no_of_genes_with_as)/len(gene_set)
+	#convert to a histogram-like list
+	fraction_as_vs_no_of_p_funcs = [0]*max_no_of_p_funcs
+	for no_of_p_funcs, fraction_as in no_of_p_funcs2fraction_as.iteritems():
+		fraction_as_vs_no_of_p_funcs[no_of_p_funcs-1] = fraction_as
+	return fraction_as_vs_no_of_p_funcs
+	
+
+
+"""
 11-02-05 find patterns from good_cluster_table given a go_no_set and output them
 """
 def find_patterns_given_go_no_set(curs, schema_instance, given_go_no_set, pic_output_dir):
@@ -2734,9 +2759,11 @@ if __name__ == '__main__':
 		print "Usage: misc.py schema picklefile"
 		sys.exit(0)
 	schema, picklefile =  sys.argv[1:]
-	from codense.common import get_gene_no2no_of_events
+	from codense.common import get_gene_no2no_of_events, get_gene_no2family_size
 	conn, curs = db_connect(hostname, dbname, schema)
-	gene_no2no_of_events = get_gene_no2no_of_events(curs)
+	gene_no2no_of_events = get_gene_no2family_size(curs, 9606)	#11-29-05 try family size
+	#gene_no2no_of_events = get_gene_no2no_of_events(curs, ensembl2no_of_events_table='graph.ensembl2no_of_events')
+	#avg_events_vs_no_of_p_funcs = pleiotropy2fraction_as(picklefile, gene_no2no_of_events)
 	avg_events_vs_no_of_p_funcs = pleiotropy2as(picklefile, gene_no2no_of_events)
 	print avg_events_vs_no_of_p_funcs
 	
