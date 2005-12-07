@@ -809,37 +809,27 @@ def output_graph_edge_from_matrix(matrix_file):
 """
 05-24-05
 	remove a series of tables based on the input_fname
+12-01-05
+	use form_schema_tables()
 """
-def remove_tables(input_fname, hostname='zhoudb', dbname='graphdb', schema='sc_new_38', commit=0):
-	splat_result_table = "splat_%s"%input_fname
-	mcl_result_table = "mcl_%s"%input_fname
-	cluster_stat_table = "cluster_%s"%input_fname
-	p_gene_table = "p_gene_%s_e5"%input_fname
-	gene_p_table = "gene_p_%s_e5_p01"%input_fname
-	edge_input_fname = '%se'%input_fname
-	e_splat_result_table = "splat_%s"%edge_input_fname
-	e_mcl_result_table = "mcl_%s"%edge_input_fname
-	e_cluster_stat_table = "cluster_%s"%edge_input_fname
-	e_p_gene_table = "p_gene_%s_e5"%edge_input_fname
-	e_gene_p_table = "gene_p_%s_e5_p01"%edge_input_fname
-	
-	old_cluster_stat_table = "cluster_stat_%s"%input_fname
-	old_splat_result_table = "splat_result_%s"%input_fname
-	old_mcl_result_table = "mcl_result_%s"%input_fname
-	table_list = [splat_result_table, mcl_result_table, cluster_stat_table, p_gene_table, gene_p_table,\
-		e_splat_result_table, e_mcl_result_table,e_cluster_stat_table, e_p_gene_table, e_gene_p_table, \
-		old_cluster_stat_table, old_splat_result_table, old_mcl_result_table]
-	from codense.common import db_connect
+def remove_tables(input_fname, lm_bit, acc_cut_off=0.6, hostname='zhoudb', dbname='graphdb', schema='sc_new_38', commit=0):
+	import sys,os
+	sys.path += [os.path.expanduser('~/script/annot/bin')]
+	from codense.common import db_connect, form_schema_tables
+	schema_instance = form_schema_tables(input_fname, acc_cut_off, lm_bit)
+	table_list = [schema_instance.gene_p_table,\
+		schema_instance.lm_table, schema_instance.good_cluster_table, schema_instance.cluster_bs_table]
 	import psycopg, sys
 	conn, curs = db_connect(hostname, dbname, schema)
 	for table in table_list:
 		try:
-			sys.stderr.write("Deleting %s...\n"%table)
+			sys.stderr.write("Deleting %s"%table)
 			curs.execute("drop table %s"%table)
+			sys.stderr.write('.\n')
 			if commit:
 				curs.execute("end")
 		except:
-			print "Deleting %s error: %s"%(table, repr(sys.exc_info()[0]))
+			print "\tError in deleting %s.  %s"%(table, repr(sys.exc_info()[0]))
 			conn, curs = db_connect(hostname, dbname, schema)
 
 """
@@ -2729,6 +2719,51 @@ def get_gene2freq_from_prediction_pair2freq(prediciton_pair2freq):
 			gene2freq[gene_no] = freq
 	return gene2freq
 
+"""
+11-29-05
+	get ensembl_id2no_of_promoters from Kim2005 supplemental table S4
+"""
+def get_ensembl_id2no_of_promoters(input_fname):
+	import csv
+	ensembl_id2no_of_promoters = {}
+	reader = csv.reader(open(input_fname), delimiter='\t')
+	#skip the 1st and 2nd line
+	reader.next()
+	reader.next()
+	for row in reader:
+		ensembl_id = row[0]
+		dot_index = ensembl_id.find('.')
+		if dot_index!=-1:
+			ensembl_id = ensembl_id[:dot_index]
+		no_of_promoters = int(row[2])
+		ensembl_id2no_of_promoters[ensembl_id] = no_of_promoters
+	del reader
+	
+	#output
+	output_f = open('/tmp/ensembl_id2no_of_promoters', 'w')
+	for ensembl_id, no_of_promoters in ensembl_id2no_of_promoters.iteritems():
+		output_f.write('%s\t%s\n'%(ensembl_id, no_of_promoters))
+	del output_f
+	return ensembl_id2no_of_promoters
+
+"""
+12-04-05
+"""
+def cal_multi_fraction(ls):
+	multi_number = sum(ls[1:])
+	return float(multi_number)/sum(ls)
+
+"""
+12-06-05
+"""
+def get_gene_no2rank(gene_no_dict):
+	value_gene_no_ls = []
+	for gene_no, value in gene_no_dict.iteritems():
+		value_gene_no_ls.append([value, gene_no])
+	value_gene_no_ls.sort()
+	
+
+
 if __name__ == '__main__':
 	
 	import sys,os
@@ -2757,15 +2792,36 @@ if __name__ == '__main__':
 	
 	if len(sys.argv)==1:
 		print "Usage: misc.py schema picklefile"
+		print "\t investigate how alternative splicing or other stuff is correlated to multi-function."
+		print "OR"
+		print "Usage: misc.py schema input_fname lm_bit acc_cut_off type outputfname"
+		print "\t type: 0(redundant), 1(non-redundant)"
 		sys.exit(0)
-	schema, picklefile =  sys.argv[1:]
-	from codense.common import get_gene_no2no_of_events, get_gene_no2family_size
-	conn, curs = db_connect(hostname, dbname, schema)
-	gene_no2no_of_events = get_gene_no2family_size(curs, 9606)	#11-29-05 try family size
-	#gene_no2no_of_events = get_gene_no2no_of_events(curs, ensembl2no_of_events_table='graph.ensembl2no_of_events')
-	#avg_events_vs_no_of_p_funcs = pleiotropy2fraction_as(picklefile, gene_no2no_of_events)
-	avg_events_vs_no_of_p_funcs = pleiotropy2as(picklefile, gene_no2no_of_events)
-	print avg_events_vs_no_of_p_funcs
+	if len(sys.argv)==3:
+		schema, picklefile =  sys.argv[1:3]
+		from codense.common import get_gene_no2no_of_events, get_gene_no2family_size
+		conn, curs = db_connect(hostname, dbname, schema)
+		
+		#11-30-05 try network topologies
+		#from codense.common import get_gene_no2no_of_topologies
+		#input_fname = 'hs_fim_92m5x25bfsdfl10q0_7gf1p0_0001'
+		#lm_bit = '000001'
+		#acc_cut_off  = 0.6
+		#schema_instance = form_schema_tables(input_fname, acc_cut_off, lm_bit)
+		#similarity_cutoff = float(sys.argv[3])
+		#distance = int(sys.argv[4])
+		#gene_no2no_of_events = get_gene_no2no_of_topologies(curs, schema_instance, similarity_cutoff, distance)
+		
+		#gene_no2no_of_events = get_gene_no2family_size(curs, 9606)	#11-29-05 try family size
+		
+		#11-29-05 try promoter
+		#gene_no2no_of_events = get_gene_no2no_of_events(curs, ensembl2no_of_events_table='graph.ensembl_id2no_of_promoters')
+		
+		
+		gene_no2no_of_events = get_gene_no2no_of_events(curs, ensembl2no_of_events_table='graph.ensembl2no_of_events')
+		#avg_events_vs_no_of_p_funcs = pleiotropy2fraction_as(picklefile, gene_no2no_of_events)
+		avg_events_vs_no_of_p_funcs = pleiotropy2as(picklefile, gene_no2no_of_events)
+		print avg_events_vs_no_of_p_funcs
 	
 	
 	#11-01-05 following is used to filter cluster_bs_table
@@ -2783,49 +2839,44 @@ if __name__ == '__main__':
 	"""
 	
 	###10-31-05 following is for global pleiotropy of one prediciton setting
-	"""
+	
 	import sys,os
 	sys.path += [os.path.expanduser('~/script/annot/bin')]
 	from codense.common import db_connect, p_gene_id_src_set_from_gene_p_table,\
 		get_gene_no2p_go_no_set_given_p_gene_id_set, form_schema_tables, p_gene_id_set_from_gene_p_table
 	hostname='zhoudb'
 	dbname='graphdb'
-	if len(sys.argv)==1:
-		print "Usage: misc.py schema input_fname lm_bit acc_cut_off type outputfname"
-		print "type: 0(redundant), 1(non-redundant)"
-		sys.exit(0)
-	
-	schema, input_fname, lm_bit, acc_cut_off, type, outputfname = sys.argv[1:]
-	acc_cut_off = float(acc_cut_off)
-	type = int(type)
-	conn, curs = db_connect(hostname, dbname, schema)
-	schema_instance = form_schema_tables(input_fname, acc_cut_off, lm_bit)
-	if type==0:
-		p_gene_id_src_set = p_gene_id_set_from_gene_p_table(curs, schema_instance.gene_p_table)
-	else:
-		p_gene_id_src_set = p_gene_id_src_set_from_gene_p_table(curs, schema_instance.gene_p_table)
-	gene_no2p_go_no_set 	= get_gene_no2p_go_no_set_given_p_gene_id_set(curs, \
-		schema_instance.p_gene_table, p_gene_id_src_set, report=1)
-	
-	
-	#10-31-05 following is for histogram drawing
-	no_of_genes_vs_no_of_p_funcs = []	#index is no_of_p_funcs, value is no_of_genes, like histogram
-	for gene_no, p_go_no_set in gene_no2p_go_no_set.iteritems():
-		no_of_p_funcs = len(p_go_no_set)
-		current_length = len(no_of_genes_vs_no_of_p_funcs)
-		if no_of_p_funcs>current_length:
-			no_of_genes_vs_no_of_p_funcs += [0]*(no_of_p_funcs-current_length)
-		no_of_genes_vs_no_of_p_funcs[no_of_p_funcs-1] += 1
-	print no_of_genes_vs_no_of_p_funcs
-	
-	
-	#following stuff dumps the object into a picklefile
-	no_of_p_funcs2no_of_genes = {}
-	for gene_no, p_go_no_set in gene_no2p_go_no_set.iteritems():
-		no_of_p_funcs = len(p_go_no_set)
-		if no_of_p_funcs not in no_of_p_funcs2no_of_genes:
-			no_of_p_funcs2no_of_genes[no_of_p_funcs] = Set()
-		no_of_p_funcs2no_of_genes[no_of_p_funcs].add(gene_no)
-	import cPickle
-	cPickle.dump(no_of_p_funcs2no_of_genes, open(outputfname, 'w'))
-	"""
+	if len(sys.argv)==7:
+		schema, input_fname, lm_bit, acc_cut_off, type, outputfname = sys.argv[1:]
+		acc_cut_off = float(acc_cut_off)
+		type = int(type)
+		conn, curs = db_connect(hostname, dbname, schema)
+		schema_instance = form_schema_tables(input_fname, acc_cut_off, lm_bit)
+		if type==0:
+			p_gene_id_src_set = p_gene_id_set_from_gene_p_table(curs, schema_instance.gene_p_table)
+		else:
+			p_gene_id_src_set = p_gene_id_src_set_from_gene_p_table(curs, 'gene_p_test') #schema_instance.gene_p_table)
+		gene_no2p_go_no_set 	= get_gene_no2p_go_no_set_given_p_gene_id_set(curs, \
+			schema_instance.p_gene_table, p_gene_id_src_set, report=1)
+		
+		
+		#10-31-05 following is for histogram drawing
+		no_of_genes_vs_no_of_p_funcs = []	#index is no_of_p_funcs, value is no_of_genes, like histogram
+		for gene_no, p_go_no_set in gene_no2p_go_no_set.iteritems():
+			no_of_p_funcs = len(p_go_no_set)
+			current_length = len(no_of_genes_vs_no_of_p_funcs)
+			if no_of_p_funcs>current_length:
+				no_of_genes_vs_no_of_p_funcs += [0]*(no_of_p_funcs-current_length)
+			no_of_genes_vs_no_of_p_funcs[no_of_p_funcs-1] += 1
+		print no_of_genes_vs_no_of_p_funcs
+		
+		
+		#following stuff dumps the object into a picklefile
+		no_of_p_funcs2no_of_genes = {}
+		for gene_no, p_go_no_set in gene_no2p_go_no_set.iteritems():
+			no_of_p_funcs = len(p_go_no_set)
+			if no_of_p_funcs not in no_of_p_funcs2no_of_genes:
+				no_of_p_funcs2no_of_genes[no_of_p_funcs] = Set()
+			no_of_p_funcs2no_of_genes[no_of_p_funcs].add(gene_no)
+		import cPickle
+		cPickle.dump(no_of_p_funcs2no_of_genes, open(outputfname, 'w'))
