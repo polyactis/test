@@ -2762,6 +2762,200 @@ def get_gene_no2rank(gene_no_dict):
 		value_gene_no_ls.append([value, gene_no])
 	value_gene_no_ls.sort()
 	
+	
+"""
+12-06-05
+"""
+def filter_fim_output(input_fname, output_fname, min_support, max_support):
+	inf = open(input_fname, 'r')
+	outf = open(output_fname, 'w')
+	for line in inf:
+		row = line.split()
+		if len(row)>=min_support and len(row)<=max_support:
+			outf.write('%s'%line)
+	del inf, outf
+
+
+"""
+12-07-05
+import sys, os
+sys.path += [os.path.expanduser('~/script/annot/bin')]
+from codense.common import fill_edge2encodedOccurrence, db_connect
+hostname='zhoudb'
+dbname='graphdb'
+schema='scfim30'
+conn, curs = db_connect(hostname, dbname, schema)
+edge2encodedOccurrence, no_of_datasets = fill_edge2encodedOccurrence(curs, 0, 500)
+"""
+def get_occurrent_dataset_ls(recurrence_array):
+	occurrent_dataset_ls = []
+	for i in range(len(recurrence_array)):
+		if recurrence_array[i] == 1.0:
+			occurrent_dataset_ls.append(i)	#starts from 0
+	return occurrent_dataset_ls
+	
+
+def cal_original_density(curs, pattern_table, edge2encodedOccurrence, no_of_datasets, \
+	min_density, max_density, edge_table='edge_cor_vector'):
+	import sys, os
+	sys.path += [os.path.expanduser('~/script/annot/bin')]
+	from MpiFromDatasetSignatureToPattern import decodeOccurrenceToBv
+	curs.execute("DECLARE crs CURSOR FOR SELECT id, vertex_set, connectivity, recurrence_array from %s"%(pattern_table))
+	curs.execute("fetch 5000 from crs")
+	rows = curs.fetchall()
+	counter = 0
+	real_counter = 0
+	real_counter2 = 0
+	density_ls = []
+	while rows:
+		for row in rows:
+			id, vertex_set, connectivity, recurrence_array = row
+			if connectivity>=min_density and connectivity<=max_density:
+				vertex_set = vertex_set[1:-1].split(',')
+				vertex_set = map(int, vertex_set)
+				no_of_nodes = len(vertex_set)
+				recurrence_array = recurrence_array[1:-1].split(',')
+				recurrence_array = map(float, recurrence_array)
+				#only the on datasets, starting from 0
+				occurrent_dataset_ls = get_occurrent_dataset_ls(recurrence_array)
+				
+				no_of_edges_vector = [0]*no_of_datasets
+				for i in range(no_of_nodes):
+					for j in range(i+1, no_of_nodes):
+						edge_tuple = (vertex_set[i], vertex_set[j])
+						if edge_tuple in edge2encodedOccurrence:
+							sig_vector = decodeOccurrenceToBv(edge2encodedOccurrence[edge_tuple], no_of_datasets)
+							for k in occurrent_dataset_ls:	#only the on datasets
+								if sig_vector[k] == 1:
+									no_of_edges_vector[k] += 1
+				#calculate the density in each original dataset, only the on datasets
+				total_low = 1
+				for i in occurrent_dataset_ls:
+					original_density = no_of_edges_vector[i]*2.0/(no_of_nodes*(no_of_nodes-1))	#WATCH 2.0(float)
+					if original_density>=0.5:	#not all original_density is low
+						total_low = 0
+					density_ls.append(original_density)
+				real_counter += 1
+				if total_low:
+					real_counter2 += 1
+			counter += 1
+		sys.stderr.write("%s%s\t%s\t%s"%('\x08'*30, counter, real_counter, real_counter2))
+		curs.execute("fetch 5000 from crs")
+		rows = curs.fetchall()
+	curs.execute("close crs")
+	return density_ls
+
+"""
+12-12-05
+"""
+def get_gene_no2no_of_functions_from_picklefile(picklefile):
+	sys.stderr.write('Getting gene_no2no_of_functions from picklefile...')
+	import cPickle
+	no_of_p_funcs2gene_set = cPickle.load(open(picklefile))
+	gene_no2no_of_functions = {}
+	for no_of_p_funcs, gene_set in no_of_p_funcs2gene_set.iteritems():
+		for gene_no in gene_set:
+			gene_no2no_of_functions[gene_no] = no_of_p_funcs
+	sys.stderr.write("Done.\n")
+	return gene_no2no_of_functions
+
+
+"""
+12-12-05
+"""
+def get_avg_no_of_functions_vs_gene_age(gene_no2no_of_functions, gene_no2ca_depth):
+	sys.stderr.write('Getting avg_no_of_functions_vs_gene_age...')
+	ca_depth2no_of_functions_ls = {}
+	for gene_no, ca_depth in gene_no2ca_depth.iteritems():
+		if gene_no in gene_no2no_of_functions:
+			if ca_depth not in ca_depth2no_of_functions_ls:
+				ca_depth2no_of_functions_ls[ca_depth] = []
+			ca_depth2no_of_functions_ls[ca_depth].append(gene_no2no_of_functions[gene_no])
+	ca_depth_ls = []
+	avg_no_of_functions_ls = []
+	no_of_genes_ls = []
+	for ca_depth, no_of_functions_ls in ca_depth2no_of_functions_ls.iteritems():
+		ca_depth_ls.append(ca_depth)
+		avg_no_of_functions_ls.append(sum(no_of_functions_ls)/float(len(no_of_functions_ls)))
+		no_of_genes_ls.append(len(no_of_functions_ls))
+	sys.stderr.write("Done.\n")
+	return ca_depth_ls, avg_no_of_functions_ls, no_of_genes_ls
+
+"""
+12-14-05
+	consider the family_size
+"""
+def get_avg_no_of_functions_vs_gene_age_considering_family_size(\
+	gene_no2no_of_functions, gene_no2ca_depth, gene_no2family_size):
+	sys.stderr.write('Getting avg_no_of_functions_vs_gene_age...')
+	ca_depth2no_of_functions_ls = {}
+	print
+	for gene_no, ca_depth in gene_no2ca_depth.iteritems():
+		if gene_no not in gene_no2family_size or gene_no2family_size[gene_no]<5:
+			continue
+		if gene_no in gene_no2no_of_functions:
+			if ca_depth not in ca_depth2no_of_functions_ls:
+				ca_depth2no_of_functions_ls[ca_depth] = []
+			print ca_depth, gene_no
+			ca_depth2no_of_functions_ls[ca_depth].append(gene_no2no_of_functions[gene_no])
+	ca_depth_ls = []
+	avg_no_of_functions_ls = []
+	no_of_genes_ls = []
+	for ca_depth, no_of_functions_ls in ca_depth2no_of_functions_ls.iteritems():
+		ca_depth_ls.append(ca_depth)
+		avg_no_of_functions_ls.append(sum(no_of_functions_ls)/float(len(no_of_functions_ls)))
+		no_of_genes_ls.append(len(no_of_functions_ls))
+	sys.stderr.write("Done.\n")
+	return ca_depth_ls, avg_no_of_functions_ls, no_of_genes_ls
+
+"""
+12-12-05
+"""
+def gene_set_from_file(input_fname):
+	import csv
+	from sets import Set
+	reader = csv.reader(open(input_fname), delimiter='\t')
+	gene_set = Set()
+	for row in reader:
+		gene_set.add(int(row[2]))
+	return gene_set
+
+def find_pattern_within_gene_set(curs, good_cluster_table, gene_set):
+	curs.execute("DECLARE gs_crs CURSOR FOR SELECT mcl_id, vertex_set from %s"%(good_cluster_table))
+	curs.execute("fetch 1000 from gs_crs")
+	rows = curs.fetchall()
+	while rows:
+		for row in rows:
+			mcl_id, vertex_set = row
+			vertex_set = vertex_set[1:-1].split(',')
+			vertex_set = map(int, vertex_set)
+			all_within_gene_set = 1
+			for gene_no in vertex_set:
+				if gene_no not in gene_set:
+					all_within_gene_set = 0
+			if all_within_gene_set:
+				print "mcl_id:",mcl_id
+		curs.execute("fetch 1000 from gs_crs")
+		rows = curs.fetchall()
+	
+"""
+12-12-05
+	to draw recurrence vs connectivity
+"""
+def rec_con_return(curs, good_cluster_table):
+	curs.execute("DECLARE gs_crs CURSOR FOR SELECT recurrence, connectivity from %s"%(good_cluster_table))
+	curs.execute("fetch 1000 from gs_crs")
+	rows = curs.fetchall()
+	recurrence_ls = []
+	connectivity_ls = []
+	while rows:
+		for row in rows:
+			recurrence_ls.append(row[0])
+			connectivity_ls.append(row[1])
+		curs.execute("fetch 1000 from gs_crs")
+		rows = curs.fetchall()
+	return recurrence_ls, connectivity_ls
+
 
 
 if __name__ == '__main__':
@@ -2793,14 +2987,47 @@ if __name__ == '__main__':
 	if len(sys.argv)==1:
 		print "Usage: misc.py schema picklefile"
 		print "\t investigate how alternative splicing or other stuff is correlated to multi-function."
-		print "OR"
+		print
 		print "Usage: misc.py schema input_fname lm_bit acc_cut_off type outputfname"
 		print "\t type: 0(redundant), 1(non-redundant)"
+		print "\t output no_of_genes vs no_of_functions into outputfname(picklefile)"
+		print
+		print "Usage: misc.py schema input_fname good_cluster_table"
+		print "\t investigate patterns entirely from the gene-set from input_fname"
+		print
 		sys.exit(0)
+	
+	if len(sys.argv)==4:
+		schema, input_fname, good_cluster_table =  sys.argv[1:5]
+		conn, curs = db_connect(hostname, dbname, schema)
+		gene_set = gene_set_from_file(input_fname)
+		find_pattern_within_gene_set(curs, good_cluster_table, gene_set)
+	
 	if len(sys.argv)==3:
 		schema, picklefile =  sys.argv[1:3]
 		from codense.common import get_gene_no2no_of_events, get_gene_no2family_size
 		conn, curs = db_connect(hostname, dbname, schema)
+		
+		#12-12-05 test gene_no2no_of_components
+		#from codense.common import get_gene_no2no_of_components_given_gene_id_set, get_gene_id2gene_no
+		#gene_id2gene_no = get_gene_id2gene_no(curs)
+		#gene_no2no_of_components = get_gene_no2no_of_components_given_gene_id_set(curs, gene_id2gene_no, 'Saccharomyces cerevisiae')
+		#gene_no2no_of_events = gene_no2no_of_components
+		
+		#12-12-05 test to see no_of_function2gene_age
+		from codense.common import get_tg_tax_id2ca_depth, get_gene_id2ca_depth
+		tg_tax_id2ca_depth = get_tg_tax_id2ca_depth(curs, 9606)
+		gene_id2ca_depth = get_gene_id2ca_depth(curs, 9606, tg_tax_id2ca_depth)
+		gene_no2no_of_functions = get_gene_no2no_of_functions_from_picklefile(picklefile)
+		gene_no2family_size = get_gene_no2family_size(curs, 9606)	#12-14-05
+		print get_avg_no_of_functions_vs_gene_age_considering_family_size(\
+			gene_no2no_of_functions, gene_id2ca_depth, gene_no2family_size)
+		
+		#12-12-05 test get_gene_no2no_of_tfbs
+		#from codense.common import get_gene_no2no_of_tfbs
+		#gene_no2no_of_tfbs = get_gene_no2no_of_tfbs(curs, schema='harbison2004')
+		#gene_no2no_of_events = gene_no2no_of_tfbs
+		
 		
 		#11-30-05 try network topologies
 		#from codense.common import get_gene_no2no_of_topologies
@@ -2818,10 +3045,10 @@ if __name__ == '__main__':
 		#gene_no2no_of_events = get_gene_no2no_of_events(curs, ensembl2no_of_events_table='graph.ensembl_id2no_of_promoters')
 		
 		
-		gene_no2no_of_events = get_gene_no2no_of_events(curs, ensembl2no_of_events_table='graph.ensembl2no_of_events')
+		#gene_no2no_of_events = get_gene_no2no_of_events(curs, ensembl2no_of_events_table='graph.ensembl2no_of_events')
 		#avg_events_vs_no_of_p_funcs = pleiotropy2fraction_as(picklefile, gene_no2no_of_events)
-		avg_events_vs_no_of_p_funcs = pleiotropy2as(picklefile, gene_no2no_of_events)
-		print avg_events_vs_no_of_p_funcs
+		#avg_events_vs_no_of_p_funcs = pleiotropy2as(picklefile, gene_no2no_of_events)
+		#print avg_events_vs_no_of_p_funcs
 	
 	
 	#11-01-05 following is used to filter cluster_bs_table
