@@ -2957,6 +2957,57 @@ def rec_con_return(curs, good_cluster_table):
 	return recurrence_ls, connectivity_ls
 
 
+"""
+12-16-05
+	convert schema harbison2004 into 1+14 files for Jasmine
+"""
+def harbison2004toFiles(curs, output_dir):
+	import os, sys
+	from sets import Set
+	import csv
+	#get tf2target_gene_condition
+	curs.execute("select b.mt_id, g.gene_symbol, b.comment from gene.gene g, harbison2004.binding_site b\
+		where b.prom_id = g.gene_id")
+	rows = curs.fetchall()
+	tf2target_gene_condition = {}
+	condition_set = Set()
+	for row in rows:
+		tf_name, gene_symbol, condition = row
+		if tf_name not in tf2target_gene_condition:
+			tf2target_gene_condition[tf_name] = []
+		tf2target_gene_condition[tf_name].append((gene_symbol, condition))
+		condition_set.add(condition)
+	#sort tf2target_gene_condition into tf_target_gene_condition_ls
+	tf_target_gene_condition_ls = []
+	for tf, target_gene_condition_ls in tf2target_gene_condition.iteritems():
+		tf_target_gene_condition_ls.append((tf, target_gene_condition_ls))
+	tf_target_gene_condition_ls.sort()
+	
+	#prepare output files
+	condition2file_handler = {}
+	for condition in condition_set:
+		filename = os.path.join(output_dir, 'yeast_%s.regulatory'%condition)
+		condition2file_handler[condition] = csv.writer(open(filename, 'w'), delimiter='\t')
+	ensemble_filename = os.path.join(output_dir, 'yeast.regulatory')
+	ensemble_file = csv.writer(open(ensemble_filename, 'w'), delimiter='\t')
+	#write out
+	for tf, target_gene_condition_ls in tf_target_gene_condition_ls:
+		condition2target_gene_ls = {}
+		ensemble_gene_set = Set()
+		for target_gene, condition in target_gene_condition_ls:
+			if condition not in condition2target_gene_ls:
+				condition2target_gene_ls[condition] = []
+			condition2target_gene_ls[condition].append(target_gene)
+			ensemble_gene_set.add(target_gene)
+		ensemble_gene_ls  = list(ensemble_gene_set)
+		ensemble_gene_ls.sort()
+		ensemble_file.writerow([tf] + ensemble_gene_ls)
+		for condition, target_gene_ls in condition2target_gene_ls.iteritems():
+			target_gene_ls.sort()
+			condition2file_handler[condition].writerow([tf] + target_gene_ls)
+	#close all files
+	del ensemble_file
+	del condition2file_handler
 
 if __name__ == '__main__':
 	
