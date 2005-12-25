@@ -811,26 +811,37 @@ def output_graph_edge_from_matrix(matrix_file):
 	remove a series of tables based on the input_fname
 12-01-05
 	use form_schema_tables()
+12-23-05
+	add more tables
 """
 def remove_tables(input_fname, lm_bit, acc_cut_off=0.6, hostname='zhoudb', dbname='graphdb', schema='sc_new_38', commit=0):
 	import sys,os
 	sys.path += [os.path.expanduser('~/script/annot/bin')]
 	from codense.common import db_connect, form_schema_tables
 	schema_instance = form_schema_tables(input_fname, acc_cut_off, lm_bit)
-	table_list = [schema_instance.gene_p_table,\
+	table_list = [schema_instance.mcl_table, schema_instance.splat_table,  schema_instance.pattern_table, \
+		schema_instance.p_gene_table, schema_instance.gene_p_table,\
 		schema_instance.lm_table, schema_instance.good_cluster_table, schema_instance.cluster_bs_table]
 	import psycopg, sys
 	conn, curs = db_connect(hostname, dbname, schema)
 	for table in table_list:
 		try:
-			sys.stderr.write("Deleting %s"%table)
+			sys.stderr.write("Deleting table %s"%table)
 			curs.execute("drop table %s"%table)
 			sys.stderr.write('.\n')
 			if commit:
 				curs.execute("end")
 		except:
-			print "\tError in deleting %s.  %s"%(table, repr(sys.exc_info()[0]))
-			conn, curs = db_connect(hostname, dbname, schema)
+			try:
+				conn, curs = db_connect(hostname, dbname, schema)
+				sys.stderr.write("Deleting view %s"%table)
+				curs.execute("drop view %s"%table)
+				sys.stderr.write('.\n')
+				if commit:
+					curs.execute("end")
+			except:
+				print "\tError in deleting %s.  %s"%(table, repr(sys.exc_info()[0]))
+				conn, curs = db_connect(hostname, dbname, schema)
 
 """
 05-24-05
