@@ -3130,6 +3130,41 @@ def draw_hist_correlation(input_dir, output_dir):
 			r.dev_off()
 	return None
 
+"""
+01-02-06
+	type:
+		1 fim_closed
+		2 closet
+"""
+def count_no_of_edges_from_fim_input(fim_input_fname, type=1):
+	import csv, sys
+	if type==1:
+		delimiter_char = '\t'
+	elif type==2:
+		delimiter_char = ' '
+	
+	reader = csv.reader(open(fim_input_fname, 'r'), delimiter=delimiter_char)
+	dataset_no2no_of_edges = {}
+	counter = 0
+	for row in reader:
+		if type==2:
+			row.pop(0)	#for closet+, the 1st entry is no of items
+		for dataset_no in row:
+			if dataset_no not in dataset_no2no_of_edges:
+				dataset_no2no_of_edges[dataset_no] = 0
+			dataset_no2no_of_edges[dataset_no] += 1
+		counter += 1
+		if counter%100000 == 0:
+			sys.stderr.write("%s%s"%('\x08'*20, counter))
+	del reader
+	
+	no_of_edges_dataset_no_ls = []
+	for dataset_no, no_of_edges in dataset_no2no_of_edges.iteritems():
+		no_of_edges_dataset_no_ls.append([no_of_edges, dataset_no])
+	return no_of_edges_dataset_no_ls
+	
+	
+
 if __name__ == '__main__':
 	
 	import sys,os
