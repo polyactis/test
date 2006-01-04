@@ -3162,8 +3162,16 @@ def count_no_of_edges_from_fim_input(fim_input_fname, type=1):
 	for dataset_no, no_of_edges in dataset_no2no_of_edges.iteritems():
 		no_of_edges_dataset_no_ls.append([no_of_edges, dataset_no])
 	return no_of_edges_dataset_no_ls
-	
-	
+
+"""
+#01-03-06 for easy console
+import sys,os
+sys.path += [os.path.expanduser('~/script/annot/bin')]
+from codense.common import db_connect, form_schema_tables
+hostname='zhoudb'
+dbname='graphdb'
+conn, curs = db_connect(hostname, dbname)
+"""
 
 if __name__ == '__main__':
 	
