@@ -3174,6 +3174,61 @@ def binary_vector2numeric_vector(binary_vector):
 			numeric_vector.append(i+1)
 	return numeric_vector
 
+"""
+01-14-06
+	parse http://wombat.gnf.org/downloads/U133A%20with%20AP%20calls.zip
+	return the probe_id's that can't be linked to EntrezGene_id
+"""
+def transform_gnf_ap_call2gene_id2tissue(input_fname, output_fname, organism, platform_id=None):
+	import sys,os
+	sys.path += [os.path.expanduser('~/script/annot/bin')]
+	from codense.common import db_connect, get_probe_id2gene_id_list
+	hostname='zhoudb'
+	dbname='graphdb'
+	conn, curs = db_connect(hostname, dbname)
+	#get probe_id2gene_id_list
+	probe_id2gene_id_list = get_probe_id2gene_id_list(curs, organism, platform_id)
+	from MpiFromDatasetSignatureToPattern import encodeOccurrence, decodeOccurrence
+	import csv, re
+	reader = csv.reader(open(input_fname, 'r'), delimiter='\t')
+	#construct number2tissue
+	number2tissue = {}
+	header_row = reader.next()
+	p_tissue = re.compile(r'\w+?_(?P<tissue>.*)_Detection')	#discard .*_Signal,
+		#first ? is used to do non-greedy match
+	for i in range(2, len(header_row), 2):
+		tissue = p_tissue.search(header_row[i]).group('tissue').strip()	#strip() to remove blanks
+		number2tissue[i/2] = tissue	# .*_Detection's index is 2, 4, 6, 8... (from 0)
+	print number2tissue
+	#construct gene_id2encoded_tissue_vector
+	gene_id2encoded_tissue_vector = {}
+	unknown_probe_id_list = []
+	for row in reader:
+		probe_id = row[0]
+		if probe_id not in probe_id2gene_id_list:	#unknown probe
+			unknown_probe_id_list.append(probe_id)
+			continue
+		tissue_vector = []
+		for i in range(2, len(row), 2):
+			if row[i] == 'P':
+				tissue_vector.append(i/2)
+		if tissue_vector:	#it could be empty
+			for gene_id in probe_id2gene_id_list[probe_id]:
+				if gene_id not in gene_id2encoded_tissue_vector:
+					gene_id2encoded_tissue_vector[gene_id] = 0	#0 means this gene doesn't have any tissue associated
+				gene_id2encoded_tissue_vector[gene_id] |= encodeOccurrence(tissue_vector)
+	
+	del reader
+	#output
+	writer = csv.writer(open(output_fname, 'w'), delimiter='\t')
+	for gene_id, encoded_tissue_vector in gene_id2encoded_tissue_vector.iteritems():
+		tissue_vector = decodeOccurrence(encoded_tissue_vector)
+		for number in tissue_vector:
+			writer.writerow([gene_id, number2tissue[number]])
+	del writer
+	
+	return unknown_probe_id_list
+
 
 """
 #01-03-06 for easy console
