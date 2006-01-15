@@ -3164,6 +3164,18 @@ def count_no_of_edges_from_fim_input(fim_input_fname, type=1):
 	return no_of_edges_dataset_no_ls
 
 """
+01-05-06
+	[0,1,0,1] => [2,4]
+"""
+def binary_vector2numeric_vector(binary_vector):
+	numeric_vector = []
+	for i in range(len(binary_vector)):
+		if binary_vector[i] == 1:
+			numeric_vector.append(i+1)
+	return numeric_vector
+
+
+"""
 #01-03-06 for easy console
 import sys,os
 sys.path += [os.path.expanduser('~/script/annot/bin')]
