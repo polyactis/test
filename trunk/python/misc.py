@@ -3229,6 +3229,65 @@ def transform_gnf_ap_call2gene_id2tissue(input_fname, output_fname, organism, pl
 	
 	return unknown_probe_id_list
 
+"""
+01-15-06
+	to show what GC_percentage looks like in fasta-format sequence files
+"""
+def draw_GC_percentage_plot(input_dir, output_fname):
+	import os, sys, fileinput
+	from rpy import r
+	files = os.listdir(input_dir)
+	files.sort()
+	sys.stderr.write("\tTotally, %d files to be processed.\n"%len(files))
+	GC_percentage_list = []
+	for i in range(len(files)):
+		f = files[i]
+		print f
+		f_path = os.path.join(input_dir, f)
+		inf = open(f_path, 'r')
+		for line in inf:
+			if line[0]=='>':
+				continue
+			no_of_GC = 0
+			for letter in line[:-1]:	#discard the \n
+				if letter=='C' or letter=='G':
+					no_of_GC += 1
+			if len(line[:-1])>100:	#if it's <=100, don't count it
+				GC_percentage_list.append(float(no_of_GC)/len(line[:-1]))
+		del inf
+	if len(GC_percentage_list)>10:
+		r.png(output_fname)
+		r.hist(GC_percentage_list, main='histogram',xlab='GC_percentage',ylab='frequency')
+		r.dev_off()
+	return GC_percentage_list
+
+"""
+01-16-06
+"""
+def get_mt_id_gc_perc2no_of_random_hits(curs, matrix2no_of_random_hits_table='transfac.matrix2no_of_random_hits'):
+	sys.stderr.write("Getting mt_id_gc_perc2no_of_random_hits...\n")
+	curs.execute("DECLARE crs CURSOR FOR select mt_id, gc_perc, no_of_hits\
+		from %s"%matrix2no_of_random_hits_table)
+	curs.execute("fetch 10000 from crs")
+	rows = curs.fetchall()
+	mt_id_gc_perc2no_of_random_hits = {}
+	counter = 0
+	while rows:
+		for row in rows:
+			mt_id, gc_perc, no_of_hits = row
+			key = (mt_id, gc_perc)
+			if key not in mt_id_gc_perc2no_of_random_hits:
+				mt_id_gc_perc2no_of_random_hits[key] = []
+			mt_id_gc_perc2no_of_random_hits[key].append(no_of_hits)
+			counter += 1
+		if counter%5000 == 0:
+			sys.stderr.write("%s%s"%('\x08'*20, counter))
+		curs.execute("fetch 10000 from crs")
+		rows = curs.fetchall()
+	
+	sys.stderr.write("Done.\n")
+	return mt_id_gc_perc2no_of_random_hits
+	
 
 """
 #01-03-06 for easy console
