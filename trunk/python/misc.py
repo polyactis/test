@@ -3291,8 +3291,14 @@ def get_mt_id_gc_perc2no_of_random_hits(curs, matrix2no_of_random_hits_table='tr
 
 """
 #01-03-06 for easy console
-import sys,os
-sys.path += [os.path.expanduser('~/script/annot/bin')]
+import sys, os, math
+bit_number = math.log(sys.maxint)/math.log(2)
+if bit_number>40:       #64bit
+	sys.path.insert(0, os.path.expanduser('~/lib64/python'))
+	sys.path.insert(0, os.path.join(os.path.expanduser('~/script64/annot/bin')))
+else:   #32bit
+	sys.path.insert(0, os.path.expanduser('~/lib/python'))
+	sys.path.insert(0, os.path.join(os.path.expanduser('~/script/annot/bin')))
 from codense.common import db_connect, form_schema_tables
 hostname='zhoudb'
 dbname='graphdb'
