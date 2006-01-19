@@ -3263,6 +3263,8 @@ def draw_GC_percentage_plot(input_dir, output_fname):
 
 """
 01-16-06
+01-18-06
+	updated version see transfac/src/AnalyzeTRANSFACHits.py
 """
 def get_mt_id_gc_perc2no_of_random_hits(curs, matrix2no_of_random_hits_table='transfac.matrix2no_of_random_hits'):
 	sys.stderr.write("Getting mt_id_gc_perc2no_of_random_hits...\n")
@@ -3284,10 +3286,20 @@ def get_mt_id_gc_perc2no_of_random_hits(curs, matrix2no_of_random_hits_table='tr
 			sys.stderr.write("%s%s"%('\x08'*20, counter))
 		curs.execute("fetch 10000 from crs")
 		rows = curs.fetchall()
-	
+		
+	for mt_id in mt_id_gc_perc2no_of_random_hits:
+			mt_id_gc_perc2no_of_random_hits[mt_id].sort()
 	sys.stderr.write("Done.\n")
 	return mt_id_gc_perc2no_of_random_hits
 	
+"""
+01-18-06
+"""
+def count_ATCG(sequence):
+	dc = {'A':0, 'T':0, 'C':0, 'G':0}
+	for letter in sequence:
+		dc[letter.upper()] += 1
+	return dc
 
 """
 #01-03-06 for easy console
@@ -3299,6 +3311,7 @@ if bit_number>40:       #64bit
 else:   #32bit
 	sys.path.insert(0, os.path.expanduser('~/lib/python'))
 	sys.path.insert(0, os.path.join(os.path.expanduser('~/script/annot/bin')))
+
 from codense.common import db_connect, form_schema_tables
 hostname='zhoudb'
 dbname='graphdb'
