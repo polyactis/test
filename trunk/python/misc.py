@@ -3302,6 +3302,87 @@ def count_ATCG(sequence):
 	return dc
 
 """
+01-19-06
+"""
+def find_edge_frequency_of_all_good_clusters(curs, good_cluster_table, pattern_table):
+	import os, sys
+	#sys.path.insert(0, os.path.join(os.path.expanduser('~/script/annot/bin')))
+	from Schema2Darwin import pattern_darwin_format
+	from sets import Set
+	
+	sys.stderr.write("Getting all edges...\n")
+	pattern_darwin_format_instance = pattern_darwin_format(acc_cut_off=0)
+	mcl_id_set = pattern_darwin_format_instance.get_mcl_id_set_from_good_cluster_table(curs, good_cluster_table)
+	edge_tuple_set = Set()
+	for mcl_id in mcl_id_set:
+		curs.execute("select edge_set from %s where id=%s"%(pattern_table, mcl_id))
+		rows = curs.fetchall()
+		edge_set = rows[0][0]
+		edge_set = edge_set[2:-2].split('},{')
+		for edge in edge_set:
+			edge = edge.split(',')
+			edge_tuple = (int(edge[0]), int(edge[1]))
+			if edge_tuple not in edge_tuple_set:
+				edge_tuple_set.add(edge_tuple)
+	sys.stderr.write("Done getting %s edges.\n"%len(edge_tuple_set))
+	
+	sys.stderr.write("Getting frequency of all edges...\n")
+	edge_frequency_ls = []
+	counter = 0
+	for edge_tuple in edge_tuple_set:
+		curs.execute("select sig_vector from edge_cor_vector where edge_name='{%s, %s}'"%(edge_tuple[0], edge_tuple[1]))
+		rows = curs.fetchall()
+		sig_vector = rows[0][0][1:-1].split(',')
+		sig_vector = map(int, sig_vector)
+		edge_frequency_ls.append(sum(sig_vector))
+		counter += 1
+		if counter%5000 ==0:
+			sys.stderr.write("%s%s"%('\x08'*15, counter))
+	sys.stderr.write("Done getting edge frequency.\n")
+	
+	frequency2occurrence = {}
+	for frequency in edge_frequency_ls:
+		if frequency not in frequency2occurrence:
+			frequency2occurrence[frequency] = 0
+		frequency2occurrence[frequency] += 1
+	
+	return frequency2occurrence
+
+
+"""
+01-19-06
+	input_fname is output of AnalyzeTRANSFACHits.py (*.data)
+"""
+def draw_p_value_distri_for_each_matrix(input_fname, output_dir):
+	import os, sys, csv
+	
+	sys.stderr.write("Reading p-values...\n")
+	mt_id2p_value_list = {}
+	reader = csv.reader(open(input_fname, 'r'), delimiter='\t')
+	counter = 0
+	for row in reader:
+		seq_id, sequence_length, mt_id, gc_perc, no_of_hits, pvalue = row
+		if mt_id not in mt_id2p_value_list:
+			mt_id2p_value_list[mt_id] = []
+		mt_id2p_value_list[mt_id].append(float(pvalue))
+		counter += 1
+		if counter%50000 ==0:
+			sys.stderr.write("%s%s"%('\x08'*15, counter))
+	sys.stderr.write("Done.\n")
+	
+	from rpy import r
+	if not os.path.isdir(output_dir):
+		os.makedirs(output_dir)
+	for mt_id, p_value_list in mt_id2p_value_list.iteritems():
+		figure_name = '%s.pvalue_hist.png'%mt_id
+		print "Drawing", figure_name
+		figure_name = os.path.join(output_dir, figure_name)
+		r.png(figure_name)
+		r.hist(p_value_list, main=mt_id, xlab='pvalue', ylab='frequency')
+		r.dev_off()
+	
+	
+"""
 #01-03-06 for easy console
 import sys, os, math
 bit_number = math.log(sys.maxint)/math.log(2)
