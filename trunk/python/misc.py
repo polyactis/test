@@ -3477,6 +3477,165 @@ def submit_jobs_for_TRANSFAC_on_random_sequence(ATCG_combination_ls, job_prefix,
 		
 
 """
+01-30-06
+"""
+def find_edges_given_dataset_signature(input_fname, dataset_signature):
+	from MpiFromDatasetSignatureToPattern import encodeOccurrenceBv, encodeOccurrence
+	import csv
+	reader = csv.reader(open(input_fname), delimiter='\t')
+	counter = 0
+	real_counter = 0
+	encoded_dataset_signature = encodeOccurrence(dataset_signature)
+	freq2edge_list = {}
+	for row in reader:
+		gene_id1 = int(row[0])
+		gene_id2 = int(row[1])
+		sig_vector = row[2:]
+		sig_vector = map(int, sig_vector)
+		encoded_recurrence = encodeOccurrenceBv(sig_vector)
+		if (encoded_recurrence&encoded_dataset_signature) == encoded_dataset_signature:
+			frequency = sum(sig_vector)
+			if frequency not in freq2edge_list:
+				freq2edge_list[frequency] = []
+			freq2edge_list[frequency].append((gene_id1, gene_id2))
+			real_counter += 1
+		counter += 1
+		if counter%20000 == 0:
+			sys.stderr.write("%s%s\t%s"%('\x08'*20, counter, real_counter))
+	del reader
+	sys.stderr.write("%s%s\t%s\n"%('\x08'*20, counter, real_counter))
+	return freq2edge_list
+
+"""
+01-30-06
+"""
+def get_gene_no2go_no_given_level(curs, schema=None, go_table='go', level=4):
+	sys.stderr.write("Getting gene_no2go_no...")
+	if schema:
+		curs.execute("set search_path to %s"%schema)
+	
+	gene_no2go_no = {}
+	
+	curs.execute("select go_no, gene_array from %s where depth=%s"%(go_table, level))
+	rows = curs.fetchall()
+	for row in rows:
+		go_no = row[0]
+		gene_list = row[1][1:-1].split(',')
+		for gene_no in gene_list:
+			gene_no = int(gene_no)
+			if gene_no not in gene_no2go_no:
+				gene_no2go_no[gene_no] = []
+			gene_no2go_no[gene_no].append(go_no)
+	sys.stderr.write("Done\n")
+	return gene_no2go_no
+
+"""
+01-30-06
+"""
+def calculate_function_pair_perc(edge_list, gene_no2go_no, go_no2name):
+	function_pair2counter = {}
+	for edge in edge_list:
+		if edge[0] not in gene_no2go_no:
+			go_no_list1 = [0]
+		else:
+			go_no_list1 = gene_no2go_no[edge[0]]
+		if edge[1] not in gene_no2go_no:
+			go_no_list2 = [0]
+		else:
+			go_no_list2 = gene_no2go_no[edge[1]]
+		for go_no1 in go_no_list1:
+			for go_no2 in go_no_list2:
+				if go_no1<go_no2:
+					function_pair = (go_no1, go_no2)
+				else:
+					function_pair = (go_no2, go_no1)
+				if function_pair not in function_pair2counter:
+					function_pair2counter[function_pair] = 0.0
+				function_pair2counter[function_pair] += 1
+	function_pair2perc = {}
+	for function_pair,counter in function_pair2counter.iteritems():
+		function_pair2perc[function_pair] = counter/len(edge_list)
+	return function_pair2perc
+	""""
+	perc_function_pair_list = []
+	for function_pair, counter in function_pair2counter.iteritems():
+		perc = counter/float(len(edge_list))
+		function_pair = (go_no2name[function_pair[0]], go_no2name[function_pair[1]])
+		perc_function_pair_list.append([perc, function_pair])
+	perc_function_pair_list.sort()
+	return perc_function_pair_list
+	"""
+
+"""
+01-30-06
+	go_no2name is not used
+"""
+def calculate_function2perc(edge_list, gene_no2go_no, go_no2name):
+	function2perc = {}
+	from sets import Set
+	gene_set = Set()
+	for edge in edge_list:
+		gene_set.add(edge[0])
+		gene_set.add(edge[1])
+	for gene_no in gene_set:
+		if gene_no not in gene_no2go_no:
+			go_no_list = [0]
+		else:
+			go_no_list = gene_no2go_no[gene_no]
+		for go_no in go_no_list:
+			if go_no not in function2perc:
+				function2perc[go_no] = 0.0
+			function2perc[go_no] += 1
+	for function, counter in function2perc.iteritems():
+		function2perc[function] = counter/len(gene_set)
+	return function2perc
+
+"""
+01-30-06
+	correlation of two value lists from two dictionaries
+"""
+def cal_correlation_between_2_function_pair2counter(function_pair2counter_1, function_pair2counter_2):
+	from sets import Set
+	function_pair_set = Set(function_pair2counter_1.keys()+function_pair2counter_2.keys())
+	perc_list1 = []
+	perc_list2 = []
+	for function_pair in function_pair_set:
+		if function_pair in function_pair2counter_1:
+			perc_list1.append(function_pair2counter_1[function_pair])
+		else:
+			perc_list1.append(0)
+		if function_pair in function_pair2counter_2:
+			perc_list2.append(function_pair2counter_2[function_pair])
+		else:
+			perc_list2.append(0)
+	from rpy import r
+	return r.cor(perc_list1, perc_list2)
+
+"""
+01-30-06
+	use calculate_function_pair_perc() and cal_correlation_between_2_function_pair2counter()
+	
+"""
+def cal_function_pair2counter_correlation_curve(freq2edge_list, center_frequency, gene_no2go_no, go_no2name, \
+	dc_function=calculate_function_pair_perc):
+	center_edge_list =freq2edge_list[center_frequency]
+	center_function_pair2perc = dc_function(center_edge_list, gene_no2go_no, go_no2name)
+	freq2correlation = {}
+	for frequency, edge_list in freq2edge_list.iteritems():
+		function_pair2perc = dc_function(edge_list, gene_no2go_no, go_no2name)
+		freq2correlation[frequency] = cal_correlation_between_2_function_pair2counter(center_function_pair2perc, function_pair2perc)
+	frequency_list = freq2correlation.keys()
+	frequency_list.sort()
+	import sys
+	correlation_list = []
+	for frequency in frequency_list:
+		sys.stdout.write("\t%s:%s"%(frequency, freq2correlation[frequency]))
+		correlation_list.append(freq2correlation[frequency])
+	print
+	return frequency_list, correlation_list
+	
+
+"""
 #01-03-06 for easy console
 import sys, os, math
 bit_number = math.log(sys.maxint)/math.log(2)
