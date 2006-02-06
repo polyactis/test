@@ -3635,6 +3635,73 @@ def cal_function_pair2counter_correlation_curve(freq2edge_list, center_frequency
 	return frequency_list, correlation_list
 	
 
+
+"""
+02-03-06
+	filter patterns based on recurrence*connectivity
+
+"""
+def filter_patterns_with_rec_conn(input_fname, output_fname, rec_conn_cutoff=2.5, debug=0):
+	import csv
+	reader = csv.reader(open(input_fname, 'r'), delimiter='\t')
+	writer = csv.writer(open(output_fname, 'w'), delimiter='\t')
+	counter = 0
+	real_counter = 0
+	for row in reader:
+		vertex_list, edge_list, recurrence_array, d_matrix = row
+		no_of_vertices = len(vertex_list[1:-1].split(','))
+		no_of_edges = len(edge_list[2:-2].split('], ['))
+		connectivity = 2*float(no_of_edges)/((no_of_vertices-1)*no_of_vertices)
+		recurrence_array = recurrence_array[1:-1].split(', ')
+		recurrence = 0.0
+		for i in range(len(recurrence_array)):
+			if recurrence_array[i] == '1.0':
+				recurrence += 1
+		if debug:
+			print row
+		if recurrence*connectivity>=rec_conn_cutoff:
+			if debug:
+				print "recurrence*connectivity:", recurrence*connectivity
+				break
+			print counter
+			writer.writerow(row)
+			real_counter += 1
+		counter += 1
+		if counter%5000==0:
+			sys.stderr.write("%s%s\t%s"%('\x08'*20, counter, real_counter))
+	sys.stderr.write("%s%s\t%s\n"%('\x08'*20, counter, real_counter))
+	del reader, writer
+
+
+"""
+02-04-06
+	input_fname is output type=2 of go_informative_node.py
+"""
+def node_dependency(input_fname, output_fname):
+	import csv
+	from sets import Set
+	reader = csv.reader(open(input_fname, 'r'), delimiter='\t')
+	writer = csv.writer(open(output_fname, 'w'), delimiter='\t')
+	go_id2gene_set = {}
+	for row in reader:
+		go_id, name = row[0], row[1]
+		gene_no_set = row[2:]
+		gene_no_set = map(int, gene_no_set)
+		go_id2gene_set[go_id] = Set(gene_no_set)
+	go_id_list = go_id2gene_set.keys()
+	for i in range(len(go_id_list)):
+		for j in range(i+1, len(go_id_list)):
+			go_id1 = go_id_list[i]
+			go_id2 = go_id_list[j]
+			gene_no_set1 = go_id2gene_set[go_id1]
+			gene_no_set2 = go_id2gene_set[go_id2]
+			length_join = float(len(gene_no_set1&gene_no_set2))
+			prob_in2given1 = length_join/len(gene_no_set1)
+			prob_in1given2 = length_join/len(gene_no_set2)
+			writer.writerow([go_id1, go_id2, prob_in2given1, prob_in1given2])
+	del reader, writer
+	
+
 """
 #01-03-06 for easy console
 import sys, os, math
