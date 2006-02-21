@@ -3703,6 +3703,60 @@ def node_dependency(input_fname, output_fname):
 	
 
 """
+02-14-06
+"""
+def compare_graphs(seed_gph_fname, other_gph_fname_list):
+	sys.stderr.write("Reading seed graph...")
+	import csv
+	reader = csv.reader(open(seed_gph_fname, 'r'), delimiter='\t')
+	edge_dict = {}
+	for row in reader:
+		if row[0] == 'e':
+			edge_tuple = (int(row[1]), int(row[2]))
+			if edge_tuple[0]>edge_tuple[1]:
+				edge_tuple = (edge_tuple[1], edge_tuple[0])
+			edge_dict[edge_tuple] = 1
+	del reader
+	sys.stderr.write("done.\n")
+	
+	sys.stderr.write("start to compare with other graphs...\n")
+	for input_fname in other_gph_fname_list:
+		print '\t' + input_fname
+		reader = csv.reader(open(input_fname, 'r'), delimiter='\t')
+		no_of_overlapping_edges = 0
+		no_of_total_edges = 0
+		for row in reader:
+			if row[0] == 'e':
+				edge_tuple = (int(row[1]), int(row[2]))
+				if edge_tuple[0]>edge_tuple[1]:
+					edge_tuple = (edge_tuple[1], edge_tuple[0])
+				if edge_tuple in edge_dict:
+					edge_dict[edge_tuple] += 1
+					no_of_overlapping_edges += 1
+				no_of_total_edges += 1
+		overlapping_ratio = float(no_of_overlapping_edges)/(len(edge_dict) + no_of_total_edges - no_of_overlapping_edges)
+		print '\t overlapping ratio: %s'%overlapping_ratio
+		del reader
+	sys.stderr.write("done.\n")
+	
+	return edge_dict
+
+
+"""
+02-19-06
+"""
+def convert_bfs2darwin(input_fname, output_fname):
+	import os, sys
+	inf = open(input_fname, 'r')
+	outf = open(output_fname, 'w')
+	outf.write('r:=[\n')
+	for line in inf:
+		row = line[:-1].split('\t')
+		outf.write('[%s],\n'%(', '.join(row[:3])))
+	outf.write('[]]:\n')
+	del inf, outf
+
+"""
 #01-03-06 for easy console
 import sys, os, math
 bit_number = math.log(sys.maxint)/math.log(2)
