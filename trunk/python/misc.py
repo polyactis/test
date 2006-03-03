@@ -3704,18 +3704,24 @@ def node_dependency(input_fname, output_fname):
 
 """
 02-14-06
+02-21-06
+	add vertex_set
 """
 def compare_graphs(seed_gph_fname, other_gph_fname_list):
 	sys.stderr.write("Reading seed graph...")
+	from sets import Set
 	import csv
 	reader = csv.reader(open(seed_gph_fname, 'r'), delimiter='\t')
 	edge_dict = {}
+	vertex_set = Set()
 	for row in reader:
 		if row[0] == 'e':
 			edge_tuple = (int(row[1]), int(row[2]))
 			if edge_tuple[0]>edge_tuple[1]:
 				edge_tuple = (edge_tuple[1], edge_tuple[0])
 			edge_dict[edge_tuple] = 1
+			vertex_set.add(edge_tuple[0])
+			vertex_set.add(edge_tuple[1])
 	del reader
 	sys.stderr.write("done.\n")
 	
@@ -3725,6 +3731,7 @@ def compare_graphs(seed_gph_fname, other_gph_fname_list):
 		reader = csv.reader(open(input_fname, 'r'), delimiter='\t')
 		no_of_overlapping_edges = 0
 		no_of_total_edges = 0
+		local_vertex_set = Set()
 		for row in reader:
 			if row[0] == 'e':
 				edge_tuple = (int(row[1]), int(row[2]))
@@ -3734,8 +3741,11 @@ def compare_graphs(seed_gph_fname, other_gph_fname_list):
 					edge_dict[edge_tuple] += 1
 					no_of_overlapping_edges += 1
 				no_of_total_edges += 1
-		overlapping_ratio = float(no_of_overlapping_edges)/(len(edge_dict) + no_of_total_edges - no_of_overlapping_edges)
-		print '\t overlapping ratio: %s'%overlapping_ratio
+				local_vertex_set.add(edge_tuple[0])
+				local_vertex_set.add(edge_tuple[1])
+		vertex_overlapping_ratio = len(local_vertex_set&vertex_set)/float(len(local_vertex_set|vertex_set))
+		edge_overlapping_ratio = float(no_of_overlapping_edges)/(len(edge_dict) + no_of_total_edges - no_of_overlapping_edges)
+		print '\t overlapping ratio: %s(edge), %s(vertex)'%(edge_overlapping_ratio, vertex_overlapping_ratio)
 		del reader
 	sys.stderr.write("done.\n")
 	
@@ -3755,6 +3765,81 @@ def convert_bfs2darwin(input_fname, output_fname):
 		outf.write('[%s],\n'%(', '.join(row[:3])))
 	outf.write('[]]:\n')
 	del inf, outf
+
+"""
+02-24-06
+"""
+def function_homogeneity_of_summary_graph_edges(input_fname, curs, schema):
+	from sets import Set
+	import csv
+	sys.stderr.write("Getting gene_no2go_no_set(only known)...")
+	gene_no2go_no_set = {}
+	curs.execute("select go_no, gene_array from %s.go where go_no!=0"%schema)
+	rows = curs.fetchall()
+	for row in rows:
+		go_no, gene_array = row
+		gene_array = gene_array[1:-1].split(',')
+		gene_array = map(int, gene_array)
+		for gene_no in gene_array:
+			if gene_no not in gene_no2go_no_set:
+				gene_no2go_no_set[gene_no] = Set()
+			gene_no2go_no_set[gene_no].add(go_no)
+	sys.stderr.write("Done.\n")
+	
+	
+	sys.stderr.write("Reading edges...")
+	edge_freq2similarity_ls = {}
+	reader = csv.reader(open(input_fname), delimiter=' ')
+	for row in reader:
+		if row[0] == 'e':
+			gene_no1 = int(row[1])
+			gene_no2 = int(row[2])
+			frequency = int(row[3])
+			if (gene_no1 in gene_no2go_no_set) and (gene_no2 in gene_no2go_no_set):
+				similarity = float(len(gene_no2go_no_set[gene_no1]&gene_no2go_no_set[gene_no2]))/len(gene_no2go_no_set[gene_no1]|gene_no2go_no_set[gene_no2])
+				if frequency not in edge_freq2similarity_ls:
+					edge_freq2similarity_ls[frequency] = []
+				edge_freq2similarity_ls[frequency].append(similarity)
+	sys.stderr.write("Done.\n")
+	
+	from rpy import r
+	from MA import average
+	freq_list = edge_freq2similarity_ls.keys()
+	freq_list.sort()
+	avg_similarity_list = []
+	no_of_entries_list = []
+	for frequency in freq_list:
+		print "frequency", frequency
+		avg_similarity = average(edge_freq2similarity_ls[frequency])
+		avg_similarity_list.append(avg_similarity)
+		no_of_entries_list.append(len(edge_freq2similarity_ls[frequency]))
+		print "\tnumber of entries", len(edge_freq2similarity_ls[frequency])
+		print "\taverage similarity", avg_similarity
+		print "\tvariance", r.var(edge_freq2similarity_ls[frequency])
+	
+	return edge_freq2similarity_ls, freq_list, avg_similarity_list, no_of_entries_list
+	
+
+"""
+02-28-06
+	for Math505b
+"""
+def factorial(x):
+	value = 1
+	for i in range(x):
+		value = value*(i+1)
+	return value
+
+def prob(N, lambda_mu):
+	import math
+	value = 0.0
+	for i in range(N+1):
+		value += math.pow(lambda_mu, i)/factorial(i)
+	value = (math.pow(lambda_mu, i)/factorial(i))/value
+	return value
+
+
+
 
 """
 #01-03-06 for easy console
