@@ -3672,6 +3672,36 @@ def filter_patterns_with_rec_conn(input_fname, output_fname, rec_conn_cutoff=2.5
 	sys.stderr.write("%s%s\t%s\n"%('\x08'*20, counter, real_counter))
 	del reader, writer
 
+"""
+03-03-06
+"""
+def rec_con_percentile(input_fname, debug=0):
+	import csv
+	reader = csv.reader(open(input_fname, 'r'), delimiter='\t')
+	counter = 0
+	rec_con_list = []
+	for row in reader:
+		vertex_list, edge_list, recurrence_array, d_matrix = row
+		no_of_vertices = len(vertex_list[1:-1].split(','))
+		no_of_edges = len(edge_list[2:-2].split('], ['))
+		connectivity = 2*float(no_of_edges)/((no_of_vertices-1)*no_of_vertices)
+		recurrence_array = recurrence_array[1:-1].split(', ')
+		recurrence = 0.0
+		for i in range(len(recurrence_array)):
+			if recurrence_array[i] == '1.0':
+				recurrence += 1
+		rec_con_list.append(connectivity*recurrence)
+		counter += 1
+		if counter%5000==0:
+			sys.stderr.write("%s%s"%('\x08'*20, counter))
+	sys.stderr.write("%s%s\n"%('\x08'*20, counter))
+	del reader
+	
+	rec_con_list.sort()
+	print "1%:", rec_con_list[int(counter*0.01)]
+	print "3%:", rec_con_list[int(counter*0.03)]
+	print "5%:", rec_con_list[int(counter*0.05)]
+	return rec_con_list
 
 """
 02-04-06
