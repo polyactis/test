@@ -3505,7 +3505,34 @@ def find_edges_given_dataset_signature(input_fname, dataset_signature):
 	del reader
 	sys.stderr.write("%s%s\t%s\n"%('\x08'*20, counter, real_counter))
 	return freq2edge_list
-
+	
+"""
+03-30-06
+"""
+def output_edge_sig_vector_given_dataset_signature(input_fname, output_fname, dataset_signature, min_support, max_support):
+	from MpiFromDatasetSignatureToPattern import encodeOccurrenceBv, encodeOccurrence
+	import csv
+	reader = csv.reader(open(input_fname), delimiter='\t')
+	writer = csv.writer(open(output_fname, 'w'), delimiter='\t')
+	counter = 0
+	real_counter = 0
+	encoded_dataset_signature = encodeOccurrence(dataset_signature)
+	for row in reader:
+		gene_id1 = int(row[0])
+		gene_id2 = int(row[1])
+		sig_vector = row[2:]
+		sig_vector = map(int, sig_vector)
+		encoded_recurrence = encodeOccurrenceBv(sig_vector)
+		if sum(sig_vector)>=min_support and sum(sig_vector) <= max_support:
+			if (encoded_recurrence&encoded_dataset_signature) == encoded_dataset_signature:
+				writer.writerow(row)
+				real_counter += 1
+		counter += 1
+		if counter%20000 == 0:
+			sys.stderr.write("%s%s\t%s"%('\x08'*20, counter, real_counter))
+	del reader, writer
+	sys.stderr.write("%s%s\t%s\n"%('\x08'*20, counter, real_counter))
+	
 """
 01-30-06
 """
@@ -3663,7 +3690,6 @@ def filter_patterns_with_rec_conn(input_fname, output_fname, rec_conn_cutoff=2.5
 			if debug:
 				print "recurrence*connectivity:", recurrence*connectivity
 				break
-			print counter
 			writer.writerow(row)
 			real_counter += 1
 		counter += 1
@@ -3868,7 +3894,23 @@ def prob(N, lambda_mu):
 	value = (math.pow(lambda_mu, i)/factorial(i))/value
 	return value
 
-
+"""
+04-02-06
+	filter haifeng's patterns
+"""
+def filter_haifeng_pattern(full_fname, rdup_fname, output_fname):
+	import csv
+	full_reader = csv.reader(open(full_fname), delimiter='\t')
+	rdup_reader = csv.reader(open(rdup_fname), delimiter='\t')
+	writer = csv.writer(open(output_fname, 'w'), delimiter='\t')
+	for row in full_reader:
+		vertex_set, edge_set, recurrence_array = row
+		vertex_set = vertex_set[1:]	#04-03-06 haifeng put [] around the whole row
+		rdup_row = rdup_reader.next()
+		row_needed = int(rdup_row[1])
+		if row_needed:
+			writer.writerow([vertex_set, edge_set])
+	del full_reader, rdup_reader, writer
 
 
 """
