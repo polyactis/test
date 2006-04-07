@@ -3897,6 +3897,8 @@ def prob(N, lambda_mu):
 """
 04-02-06
 	filter haifeng's patterns
+04-06-06
+	fix the wrong format haifeng used
 """
 def filter_haifeng_pattern(full_fname, rdup_fname, output_fname):
 	import csv
@@ -3904,11 +3906,12 @@ def filter_haifeng_pattern(full_fname, rdup_fname, output_fname):
 	rdup_reader = csv.reader(open(rdup_fname), delimiter='\t')
 	writer = csv.writer(open(output_fname, 'w'), delimiter='\t')
 	for row in full_reader:
-		vertex_set, edge_set, recurrence_array = row
-		vertex_set = vertex_set[1:]	#04-03-06 haifeng put [] around the whole row
 		rdup_row = rdup_reader.next()
 		row_needed = int(rdup_row[1])
 		if row_needed:
+			vertex_set, edge_set, recurrence_array = row
+			vertex_set = vertex_set[1:]	#04-03-06 haifeng put [] around the whole row
+			edge_set = edge_set.replace('], [', '), (')
 			writer.writerow([vertex_set, edge_set])
 	del full_reader, rdup_reader, writer
 
