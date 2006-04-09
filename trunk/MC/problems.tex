@@ -1,0 +1,31 @@
+\documentclass[a4paper,10pt]{article}
+\usepackage{makeidx}
+\usepackage[dvips]{color,graphicx}
+\usepackage[dvips, bookmarks, colorlinks=false]{hyperref}
+\makeindex
+
+%opening
+\title{Problems of Monte Carlo Strategies in Scientific Computing}
+\author{Yu Huang}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+This is a collection of solutions and notes of the book written by Jun S. Liu.
+\end{abstract}
+\tableofcontents
+
+\section{problems of Chapter 2}
+\subsection{problem 1}
+
+\begin{math}
+\int_{0}^{1} sin^2(1/x)dx = \int_{0}^{1}1/2(cos(0)-cos(2/x))dx = \int_{0}^{1}1/2(1-cos(2/x))dx = 1/2 - 1/2\int_{0}^{1}cos(2/x)dx
+\end{math}
+
+I don't know how to solve $\int_{0}^{1}cos(2/x)dx$. Several results returned by google search are not satisfactory. Instead, i use mathematica(matlab is down for some reason on hpc-cmb), $NIntegrate[Sin[1/x]*Sin[1/x], \{x, 0, 1\}]$ to get 0.673427 and regard this as the deterministic answer though mathematica fails to converge.
+
+SimulateIntegral.py uses the Monte carlo method. $1e^7$ samplings gives answers like 0.673735071387, 0.673390413619, 0.672624476819, 0.672614316515, 0.673848781644 and $1e^9$ outputs a much more accurate answer, 0.673468645949.
+
+\end{document}
