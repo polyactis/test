@@ -18,7 +18,7 @@ This is a collection of solutions and notes of the book written by Jun S. Liu.
 \tableofcontents
 
 \section{problems of Chapter 2}
-\subsection{problem 1}
+\subsection{problem 2.1}
 
 \begin{math}
 \int_{0}^{1} sin^2(1/x)dx = \int_{0}^{1}1/2(cos(0)-cos(2/x))dx = \int_{0}^{1}1/2(1-cos(2/x))dx = 1/2 - 1/2\int_{0}^{1}cos(2/x)dx
@@ -26,6 +26,9 @@ This is a collection of solutions and notes of the book written by Jun S. Liu.
 
 I don't know how to solve $\int_{0}^{1}cos(2/x)dx$. Several results returned by google search are not satisfactory. Instead, i use mathematica(matlab is down for some reason on hpc-cmb), $NIntegrate[Sin[1/x]*Sin[1/x], \{x, 0, 1\}]$ to get 0.673427 and regard this as the deterministic answer though mathematica fails to converge.
 
-SimulateIntegral.py uses the Monte carlo method. $1e^7$ samplings gives answers like 0.673735071387, 0.673390413619, 0.672624476819, 0.672614316515, 0.673848781644 and $1e^9$ outputs a much more accurate answer, 0.673468645949.
+SimulateIntegral.py uses the plain Monte carlo method. $1e^4$ samplings gives mean: 0.673037731012, and std: 0.00282346219155 and $1e^7$ samplings outputs a much more accurate answer with a smaller std: 0.673477836344 (7.40591084413e-05) .
+
+\subsection{problem 2.2}
+The only trouble is how to get the analytic form of $t_v(x; \mu, \Sigma)$ to carry out the differentiation.
 
 \end{document}
