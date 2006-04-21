@@ -29,6 +29,20 @@ I don't know how to solve $\int_{0}^{1}cos(2/x)dx$. Several results returned by 
 SimulateIntegral.py uses the plain Monte carlo method. $1e^4$ samplings gives mean: 0.673037731012, and std: 0.00282346219155 and $1e^7$ samplings outputs a much more accurate answer with a smaller std: 0.673477836344 (7.40591084413e-05) .
 
 \subsection{problem 2.2}
+We want to generate random variables that follow a distribution, $\pi(x)$. Suppose $l(x)=c\pi(x)$ is computable with $c$ unknown. We known how to sample from a trial distribution $g(x)$. There exists "covering constant", $M$ so that the envelope property [i.e. $Mg(x)>=l(x)$] is satisfied for all x.
+
+\begin{enumerate}
+\item draw a sample from $g()$, and compute the ratio $r=l(x)/Mg(x)$
+\item flip a coin with probability $r$.
+\end{enumerate}
+
+
+\subsection{problem 2.3}
 The only trouble is how to get the analytic form of $t_v(x; \mu, \Sigma)$ to carry out the differentiation.
+
+\section{An EM example}
+The problem is that there's a sequence of bits. Each bit comes from one of two benoulli distributions, say $p_1$ and $p_2$. There's a probability $r$ for the bit to come from benoulli $p_1$ and $1-r$ from $p_2$. Given a sequence of bits, infer $p_1$, $p_2$ and $r$.
+
+Using missing data approach,
 
 \end{document}
