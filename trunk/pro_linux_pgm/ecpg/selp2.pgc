@@ -1,0 +1,49 @@
+#include <stdlib.h>
+#include <stdio.h>
+
+exec sql include sqlca;
+exec sql begin declare section;
+
+int prcp;
+int temp_hi;
+VARCHAR city[50];
+int ind_city;
+
+exec sql end declare section;
+
+main (){
+
+  exec sql connect to 'gtk-user@src';
+  exec sql BEGIN WORK;
+  prcp=2;
+  exec sql declare mycursor cursor for select city from weather where prcp= :prcp;
+  exec sql open mycursor;
+  
+  exec sql fetch next in mycursor into :city:ind_city;
+  if(sqlca.sqlcode<0)
+    printf("error code %d ,message %s,rows %d,warning %c\n",sqlca.sqlcode,sqlca.sqlerrm.sqlerrmc,sqlca.sqlerrd[2],sqlca.sqlwarn[0]);
+
+  while(sqlca.sqlcode==0){
+  if(sqlca.sqlcode>=0){
+    if(ind_city>=0)
+    {
+      city.arr[city.len]='\0';
+    }
+    else
+    	strcpy(city.arr,"Unknown");
+	
+    printf("The city is %s\n",city.arr);
+  }
+
+  exec sql fetch next in mycursor into :city:ind_city;
+  if(sqlca.sqlcode<0)
+    printf("error code %d ,message %s,rows %d,warning %c\n",sqlca.sqlcode,sqlca.sqlerrm.sqlerrmc,sqlca.sqlerrd[2],sqlca.sqlwarn[0]);
+  
+  }
+
+  exec sql close mycursor;
+  exec sql COMMIT WORK;
+
+  exec sql disconnect all;
+  return EXIT_SUCCESS;
+}

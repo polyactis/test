@@ -1,0 +1,31 @@
+#include <stdlib.h>
+#include <stdio.h>
+
+exec sql include sqlca;
+exec sql begin declare section;
+
+int prcp;
+int temp_hi;
+VARCHAR city[50];
+
+exec sql end declare section;
+		
+main (){
+
+  exec sql connect to 'gtk-user@src';
+  exec sql BEGIN WORK;
+  temp_hi=52;
+  exec sql SELECT city into :city FROM weather WHERE temp_hi= :temp_hi;
+  printf("error code %d ,message %s,rows %d,warning %c\n",sqlca.sqlcode,sqlca.sqlerrm.sqlerrmc,sqlca.sqlerrd[2],sqlca.sqlwarn[0]);
+
+  if(sqlca.sqlcode==0)
+    {
+      city.arr[city.len]='\0';
+      printf("The city is %s\n",city.arr);
+    }
+
+  exec sql COMMIT WORK;
+
+  exec sql disconnect all;
+  return EXIT_SUCCESS;
+}

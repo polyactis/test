@@ -1,0 +1,17 @@
+#include <stdlib.h>
+
+exec sql include sqlca;
+
+main() 
+{
+  exec sql connect to 'gtk-user@localhost:5432 user gtk-user/gtk1.0';
+  exec sql BEGIN WORK;
+  exec sql UPDATE weather SET temp_hi=53 WHERE city='New York';
+  printf(" error code %d, message %s,rows %d ,warning %c\n",sqlca.sqlcode,
+	sqlca.sqlerrm.sqlerrmc,sqlca.sqlerrd[2],sqlca.sqlwarn[0]);
+  exec sql COMMIT WORK;
+
+  exec sql disconnect all;
+
+  return EXIT_SUCCESS;
+}
