@@ -3756,7 +3756,86 @@ def node_dependency(input_fname, output_fname):
 			prob_in1given2 = length_join/len(gene_no_set2)
 			writer.writerow([go_id1, go_id2, prob_in2given1, prob_in1given2])
 	del reader, writer
+
+
+"""
+04-16-06
+	input_fname is output type=2 of go_informative_node.py
+	three classifications
+	1. one node is mostly included by another node (includee)
+	2. one node is the includer
+	3. one node is neither
+"""
+def classify_go_informative_nodes_based_on_dependency(input_fname, prob_cutoff=0.2):
+	from sets import Set
+	import csv
+	reader = csv.reader(open(input_fname, 'r'), delimiter='\t')
+	go_id2gene_set = {}
+	for row in reader:
+		go_id, name = row[0], row[1]
+		gene_no_set = row[2:]
+		gene_no_set = map(int, gene_no_set)
+		go_id2gene_set[go_id] = Set(gene_no_set)
 	
+	go_id_list = go_id2gene_set.keys()
+	includee_set = Set()
+	includer_set = Set()
+	for i in range(len(go_id_list)):
+		for j in range(i+1, len(go_id_list)):
+			go_id1 = go_id_list[i]
+			go_id2 = go_id_list[j]
+			gene_no_set1 = go_id2gene_set[go_id1]
+			gene_no_set2 = go_id2gene_set[go_id2]
+			length_join = float(len(gene_no_set1&gene_no_set2))
+			prob_in2given1 = length_join/len(gene_no_set1)
+			prob_in1given2 = length_join/len(gene_no_set2)
+			if prob_in2given1>=prob_cutoff:
+				includee_set.add(go_id1)
+			elif prob_in1given2>=prob_cutoff:
+				includer_set.add(go_id1)
+			if prob_in1given2>=prob_cutoff:
+				includee_set.add(go_id2)
+			elif prob_in2given1>=prob_cutoff:
+				includer_set.add(go_id2)
+	del reader
+	includer_set = includer_set - includee_set
+	others = Set(go_id_list) - (includee_set|includer_set)
+	return includee_set, includer_set, others
+
+"""
+04-16-06
+	read go_no2accuracy dictionary from haifeng's R output, format like below:
+[1] 1
+   
+     FALSE   TRUE
+  0 131693  10906
+  1  19727   9749
+[1] "\n"
+[1] 2
+   
+    FALSE  TRUE
+  0 63307  7300
+  1 10899 10029
+[1] "\n"
+...
+"""
+def get_go_no2accuracy_from_haifeng_R_output(input_fname):
+	go_no2accuracy = {}
+	inf = open(input_fname)
+	for line in inf:
+		row = line.split()
+		if line[:3]=='  0':
+			no_of_false_positives = float(row[-1])
+		elif line[:3] == '  1':
+			no_of_true_positives = float(row[-1])
+			accuracy = no_of_true_positives/(no_of_true_positives+no_of_false_positives)
+			go_no = len(go_no2accuracy)+1
+			print "go_no", go_no, "no_of_false_positives", no_of_false_positives, "no_of_true_positives", no_of_true_positives, "accuracy", accuracy
+			go_no2accuracy[go_no] = [no_of_true_positives, no_of_false_positives]
+	del inf
+	return go_no2accuracy
+
+
 
 """
 02-14-06
@@ -3915,6 +3994,104 @@ def filter_haifeng_pattern(full_fname, rdup_fname, output_fname):
 			writer.writerow([vertex_set, edge_set])
 	del full_reader, rdup_reader, writer
 
+"""
+#04-11-06
+"""
+def construct_local_tf_no2gene_no_set(vertex_set, gene_no2bs_no_set):
+	from sets import Set
+	local_tf_no2gene_no_set = {}
+	for gene_no in vertex_set:
+		if gene_no in gene_no2bs_no_set:
+			for tf_no in gene_no2bs_no_set[gene_no]:
+				if tf_no not in local_tf_no2gene_no_set:
+					local_tf_no2gene_no_set[tf_no] = Set()
+				local_tf_no2gene_no_set[tf_no].add(gene_no)
+	return local_tf_no2gene_no_set
+	
+
+def find_patterns_with_distinct_TF_layout(curs, pattern_table, min_gene_ratio=0.3, max_tf_overlapping_ratio=0.1):
+	from MpiClusterBsStat import MpiClusterBsStat
+	MpiClusterBsStat_instance = MpiClusterBsStat()
+	gene_no2bs_no_block = MpiClusterBsStat_instance.get_gene_no2bs_no_block(curs)
+	gene_no2bs_no_set, bs_no2gene_no_set = MpiClusterBsStat_instance.construct_two_dicts(1,	gene_no2bs_no_block)
+	curs.execute("DECLARE crs CURSOR FOR SELECT id, vertex_set from %s"%(pattern_table))
+	curs.execute("fetch 5000 from crs")
+	rows = curs.fetchall()
+	counter = 0
+	while rows:
+		for row in rows:
+			id, vertex_set = row
+			vertex_set = vertex_set[1:-1].split(',')
+			vertex_set = map(int, vertex_set)
+			no_of_genes = len(vertex_set)
+			local_tf_no2gene_no_set = construct_local_tf_no2gene_no_set(vertex_set, gene_no2bs_no_set)
+			no_of_genes_tf_no_ls = []
+			for tf_no in local_tf_no2gene_no_set:
+				no_of_genes_tf_no_ls.append([len(local_tf_no2gene_no_set[tf_no]), tf_no])
+			if len(no_of_genes_tf_no_ls)>0:
+				no_of_genes_tf_no_ls.sort()
+				max_no_of_genes, max_tf_no = no_of_genes_tf_no_ls[0]
+				if max_no_of_genes>=min_gene_ratio*no_of_genes:
+					for i in range(1, len(no_of_genes_tf_no_ls)):
+						no_of_genes_of_tf_no, tf_no = no_of_genes_tf_no_ls[i]
+						overlapping_no_of_genes = len(local_tf_no2gene_no_set[tf_no]&local_tf_no2gene_no_set[max_tf_no])
+						if no_of_genes_of_tf_no>=min_gene_ratio*no_of_genes and overlapping_no_of_genes<=max_tf_overlapping_ratio*no_of_genes:
+							print "pattern id", id
+							print "max_tf_no %s, gene_no_set: %s"%(max_tf_no, repr(local_tf_no2gene_no_set[max_tf_no]))
+							print "tf_no: %s, gene_no_set: %s"%(tf_no, repr(local_tf_no2gene_no_set[tf_no]))
+						break
+			counter += 1
+		sys.stderr.write("%s%s"%('\x08'*20, counter))
+		curs.execute("fetch 5000 from crs")
+		rows = curs.fetchall()
+	curs.execute("close crs")
+	curs.execute("close crs0")
+
+
+"""
+04-13-06
+	transform go_informative_node.py's output (t=1) plus other unknown genes from schema's gene table
+	into haifeng's input for his function prediction scheme
+"""
+def transform_informative_node_output_format(informative_node_fname, curs, schema, output_fname):
+	import csv
+	informative_node_reader = csv.reader(open(informative_node_fname, 'r'), delimiter='\t')
+	gene_id2go_id_list = {}
+	from sets import Set
+	go_id_set = Set()
+	for row in informative_node_reader:
+		go_id, go_name, gene_id = row
+		if gene_id not in gene_id2go_id_list:
+			gene_id2go_id_list[gene_id] = []
+		gene_id2go_id_list[gene_id].append(go_id)
+		go_id_set.add(go_id)
+	del informative_node_reader
+	#get the go_id2column_index
+	go_id_list = list(go_id_set)
+	go_id_list.sort()
+	go_id2column_index = {}
+	for i in range(len(go_id_list)):
+		go_id2column_index[go_id_list[i]] = i
+	
+	writer = csv.writer(open(output_fname, 'w'), delimiter='\t')
+	go_id_list.insert(0, '')
+	go_id_list.insert(0, '')
+	writer.writerow(go_id_list)
+	
+	for gene_id in gene_id2go_id_list:
+		go_id_incidence_list = [0]*len(go_id2column_index)
+		for go_id in gene_id2go_id_list[gene_id]:
+			go_id_incidence_list[go_id2column_index[go_id]] = 1
+		writer.writerow([gene_id, 1]+go_id_incidence_list)
+	
+	#unknown genes
+	from codense.common import get_gene_id2gene_no
+	gene_id2gene_no = get_gene_id2gene_no(curs, schema)
+	
+	for gene_id in gene_id2gene_no:
+		if gene_id not in gene_id2go_id_list:
+			writer.writerow([gene_id, 0] + [0]*len(go_id2column_index))
+	del writer
 
 """
 #01-03-06 for easy console
