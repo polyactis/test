@@ -20,13 +20,15 @@ This is a collection of solutions and notes of the book written by Jun S. Liu.
 \section{problems of Chapter 2}
 \subsection{problem 2.1}
 
-\begin{math}
-\int_{0}^{1} sin^2(1/x)dx = \int_{0}^{1}1/2(cos(0)-cos(2/x))dx = \int_{0}^{1}1/2(1-cos(2/x))dx = 1/2 - 1/2\int_{0}^{1}cos(2/x)dx
-\end{math}
+\begin{eqnarray*}
+\int_{0}^{1} sin^2(1/x)dx = \int_{0}^{1}1/2(cos(0)-cos(2/x))dx \\
+=\int_{0}^{1}1/2(1-cos(2/x))dx = 1/2 - 1/2\int_{0}^{1}cos(2/x)dx
+\end{eqnarray*}
+
 
 I don't know how to solve $\int_{0}^{1}cos(2/x)dx$. Several results returned by google search are not satisfactory. Instead, i use mathematica(matlab is down for some reason on hpc-cmb), $NIntegrate[Sin[1/x]*Sin[1/x], \{x, 0, 1\}]$ to get 0.673427 and regard this as the deterministic answer though mathematica fails to converge.
 
-SimulateIntegral.py uses the plain Monte carlo method. $1e^4$ samplings gives mean: 0.673037731012, and std: 0.00282346219155 and $1e^7$ samplings outputs a much more accurate answer with a smaller std: 0.673477836344 (7.40591084413e-05) .
+SimulateIntegral.py uses the plain Monte carlo method. $1e^4$ samplings gives $mean=0.673037731012$, and $std=0.00282346219155$ and $1e^7$ samplings outputs $mean=0.673477836344$ and $std=7.40591084413e-05$, more accurate and smaller variance.
 
 \subsection{problem 2.2}
 We want to generate random variables that follow a distribution, $\pi(x)$. Suppose $l(x)=c\pi(x)$ is computable with $c$ unknown. We known how to sample from a trial distribution $g(x)$. There exists "covering constant", $M$ so that the envelope property [i.e. $Mg(x)>=l(x)$] is satisfied for all x.
@@ -34,6 +36,7 @@ We want to generate random variables that follow a distribution, $\pi(x)$. Suppo
 \begin{enumerate}
 \item draw a sample from $g()$, and compute the ratio $r=l(x)/Mg(x)$
 \item flip a coin with probability $r$.
+\item (more see page 24)
 \end{enumerate}
 
 
@@ -41,8 +44,39 @@ We want to generate random variables that follow a distribution, $\pi(x)$. Suppo
 The only trouble is how to get the analytic form of $t_v(x; \mu, \Sigma)$ to carry out the differentiation.
 
 \section{An EM example}
-The problem is that there's a sequence of bits. Each bit comes from one of two benoulli distributions, say $p_1$ and $p_2$. There's a probability $r$ for the bit to come from benoulli $p_1$ and $1-r$ from $p_2$. Given a sequence of bits, infer $p_1$, $p_2$ and $r$.
+A simplified version of the example in Appendix A.4 (page 310). The author's notation is a little bit misleading. Reference Casella's book, \emph{Statistics Inference}.
+The problem is that there's a sequence of bits. Each bit comes from one of two benoulli distributions, say $p_0$ and $p_1$. There's a probability $1-r$ for the bit to come from bernoulli $p_0$ and $r$ from $p_1$. Given a sequence of bits, infer $p_0$, $p_1$ and $r$.
 
-Using missing data approach,
+For each bit $y_i$ (observed data, $y_{obs}$), there's a corresponding bit(dichotomous variable), $z_i$, a latent-class label which indicates whether the bit is from bernoulli $p_0$ ($z_i=0$) or from bernoulli $p_1$ ($z_i=0$). Apparently, $z_i$ is the missing data($y_{mis}$). Here comes the EM algorithm.
+
+\begin{displaymath}
+f(y_{mis}, y_{obs} | \theta) = \sum_{i=1}^n(p_{z_i}^{y_i}\cdot(1-p_{z_i})^{1-y_i} \cdot r^{z_i} \cdot (1-r)^{1-z_i})
+\end{displaymath}
+
+\begin{eqnarray*}
+Q(\theta | \theta^{(t)}, y_{obs} ) & = & E(log L(\theta |y_{mis}, y_{obs}) | \theta^{(t)}, y_{obs} ) \\
+& = & E(log f(y_{mis}, y_{obs} | \theta ) | \theta^{(t)}, y_{obs} ) \\
+& = & E\biggl[\sum_i \biggl(y_i log(p_{z_i}) + (1-y_i)log(1-p_{z_i}) + z_i log(r) + (1-z_i)log(1-r) \biggr) \\
+& & | \theta^{(t)}, y_{obs} \biggr]
+\end{eqnarray*}
+
+The expectation is taken over the $z_i$, $\theta^{(t)} = (p_{0(t)}, p_{1(t)}, r^{(t)} )$.
+\begin{displaymath}
+\tau_i = p(z_i=1 | y_{obs}, \theta^{(t)}) =  \frac{r^{(t)} p_{1(t)}^{y_i} (1-p_{1(t)})^{1-y_i} } {(1-r^{(t)}) p_{0(t)}^{y_i} (1-p_{0(t)})^{1-y_i} + r^{(t)} p_{1(t)}^{y_i} (1-p_{1(t)})^{1-y_i} }
+\end{displaymath}
+
+E-step: fill in $z_i$.
+\begin{eqnarray*}
+Q(\theta | \theta^{(t)}, y_{obs} ) &=& \sum_{m=1}^2 \sum_{i=1}^n [y_i log p_m + (1-y_i) log(1-p_m)] \tau_i^m (1-\tau_i)^{1-m} \\
+&& + \sum_{i=1}^n \tau_i log r + \sum_{i=1}^n (1-\tau_i) log (1-r)
+\end{eqnarray*}
+
+M-step: let partial derivatures $\frac{\partial Q(\theta | \theta^{(t)}, y_{obs} ) } {\partial \theta} = 0$.
+\begin{eqnarray}
+\frac{\partial Q(\theta | \theta^{(t)}, y_{obs} ) } {\partial r} & = & 0 + 0 + \frac{\sum_i\tau_i}{r} - \frac{\sum_i(1-\tau_i)}{(1-r)}= 0 \nonumber \\
+r & = & \frac{\sum_i \tau_i}{n} \\
+\frac{\partial Q(\theta | \theta^{(t)}, y_{obs} ) } {\partial p_m } & = & \frac{\sum_i y_i\tau_i^m (1-\tau_i)^{(1-m)} }{p_m} - \frac{\sum_i (1-y_i)\tau_i^m (1-\tau_i)^{(1-m)}}{(1-p_m)} = 0 \nonumber \\
+p_m & = & \frac{\sum_i y_i \tau_i^m (1-\tau_i)^{(1-m)} }{ \sum_i \tau_i^m (1-\tau_i)^{(1-m)} }
+\end{eqnarray}
 
 \end{document}
