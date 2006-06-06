@@ -4093,6 +4093,104 @@ def transform_informative_node_output_format(informative_node_fname, curs, schem
 			writer.writerow([gene_id, 0] + [0]*len(go_id2column_index))
 	del writer
 
+
+
+#05-31-06
+def haifeng_datasets2my_datasets(haifeng_fname, mapping_fname, output_fname):
+	import csv
+	haifeng_f_reader = csv.reader(open(haifeng_fname, 'r'))
+	mapping_f_reader = csv.reader(open(mapping_fname, 'r'), delimiter='\t')
+	outf = open(output_fname, 'w')
+	haifeng_dataset_fname2my_fname = {}
+	for row in mapping_f_reader:
+		my_fname, haifeng_dataset_fname = row
+		haifeng_dataset_fname2my_fname[haifeng_dataset_fname] = my_fname
+	
+	for row in haifeng_f_reader:
+		outf.write('%s\n'%haifeng_dataset_fname2my_fname[row[0]])
+	
+	del haifeng_f_reader, mapping_f_reader, outf
+
+
+"""
+06-05-06
+	below are for inspecting TF association in clusters
+"""
+def get_gene_id2mt_no_set(tax_id, hostname='zhoudb', dbname='graphdb', schema='graph', table='gene_id2mt_no'):
+	sys.stderr.write("Getting gene_id2mt_no_set...")
+	gene_id2mt_no_set = {}
+	(conn, curs) =  db_connect(hostname, dbname, schema)
+	curs.execute("select gene_id, mt_no from %s where tax_id=%s"%(table, tax_id))
+	rows = curs.fetchall()
+	from sets import Set
+	for row in rows:
+		gene_id, mt_no = row
+		gene_id = int(gene_id)
+		if gene_id not in gene_id2mt_no_set:
+			gene_id2mt_no_set[gene_id] = Set()
+		gene_id2mt_no_set[gene_id].add(mt_no)
+	del conn, curs
+	sys.stderr.write("Done\n")
+	return gene_id2mt_no_set
+
+from sets import Set
+
+def get_mt_no2gene_id_set(gene_id2mt_no_set, vertex_set):
+	mt_no2gene_id_set = {}
+	for gene_id in vertex_set:
+		if gene_id in gene_id2mt_no_set:
+			for mt_no in gene_id2mt_no_set[gene_id]:
+				if mt_no not in mt_no2gene_id_set:
+					mt_no2gene_id_set[mt_no] = Set()
+				mt_no2gene_id_set[mt_no].add(gene_id)
+	return mt_no2gene_id_set
+
+
+def draw_pattern_tf_info(curs, pattern_table, condition, gene_id2mt_no_set, min_asso_number=5):
+	import networkx as nx
+	import pylab
+	curs.execute("DECLARE crs CURSOR FOR select id, edge_set from %s where %s"%(pattern_table, condition))
+	curs.execute("fetch 100 from crs")
+	rows = curs.fetchall()
+	while rows:
+		for row in rows:
+			id, edge_set = row
+			g = nx.Graph()
+			edge_set = edge_set[2:-2].split('},{')
+			for edge in edge_set:
+				edge = edge.split(',')
+				edge = map(int, edge)
+				g.add_edge(edge[0], edge[1])
+			mt_no2gene_id_set = get_mt_no2gene_id_set(gene_id2mt_no_set, g.nodes())
+			print "pattern id:", id
+			pos = nx.spring_layout(g)
+			for mt_no in mt_no2gene_id_set:
+				asso_number = len(mt_no2gene_id_set[mt_no])
+				print "\tmt_no:", mt_no, "asso_number:", asso_number
+				if asso_number<min_asso_number:
+					continue
+				color_list = []
+				for v in g:
+					if v in mt_no2gene_id_set[mt_no]:
+						color_list.append(10)
+					else:
+						color_list.append(1)
+				nx.draw(g, pos, node_color=pylab.array(color_list), with_labels=False)
+				pylab.title("pattern id: %s mt_no: %s with %s genes"%(id, mt_no, asso_number))
+				pylab.show()
+				cond = raw_input("continue?")
+				if cond=='n' or cond=='N':
+					break
+			cond = raw_input("continue?")
+			if cond=='n' or cond=='N':
+				break
+		cond = raw_input("continue?")
+		if cond=='n' or cond=='N':
+			break
+		curs.execute("fetch 100 from crs")
+		rows = curs.fetchall()
+	curs.execute("close crs")
+
 """
 #01-03-06 for easy console
 import sys, os, math
