@@ -4191,6 +4191,75 @@ def draw_pattern_tf_info(curs, pattern_table, condition, gene_id2mt_no_set, min_
 		rows = curs.fetchall()
 	curs.execute("close crs")
 
+
+"""
+2006-08-22
+	for Jasmine's collaborator, Mike West's request
+"""
+def get_E2F_Y_target_list(input_fname):
+	import string
+	inf = open(input_fname)
+	E2F_Y_target_list = []
+	for line in inf:
+		if line[0] == 'A':
+			target_ls = line[:-1].split(' = ')[1]
+			target_ls = target_ls.split(', ')
+			target_ls = map(string.strip, target_ls)
+			E2F_Y_target_list.append(target_ls)
+	del inf
+	return E2F_Y_target_list
+
+def calculate_overlapping_E2F_Y_target_list(curs, pattern_table, E2F_Y_target_list, \
+		gene_symbol2gene_id, output_fname, threshold=4, left_cutoff=0.4, right_cutoff=0.4):
+	sys.stderr.write("Calculating overlapping_E2F_Y_target_set_list...\n")
+	from sets import Set
+	from codense.common import dict_map
+	import csv
+	writer = csv.writer(open(output_fname, 'w'), delimiter='\t')
+	header = ['overlapping_ratio', 'overlapping_ratio_left(pattern)', 'overlapping_ratio_right(target_set)', \
+		'no_of_overlappings', 'pattern_id', 'target_set id']
+	writer.writerow(header)
+	curs.execute("DECLARE crs CURSOR FOR select id, vertex_set \
+		from %s"%(pattern_table))
+	curs.execute("fetch 5000 from crs")
+	rows = curs.fetchall()
+	no_of_hits = 0
+	counter = 0
+	while rows:
+		for row in rows:
+			id = row[0]
+			vertex_set = row[1][1:-1].split(',')
+			vertex_set = map(int, vertex_set)
+			vertex_set = Set(vertex_set)
+			for i in  range(len(E2F_Y_target_list)):
+				target_ls = E2F_Y_target_list[i]
+				target_ls = dict_map(gene_symbol2gene_id, target_ls)
+				target_set = Set(target_ls)
+				no_of_overlappings = len(vertex_set & target_set)
+				"""
+				print target_set
+				print vertex_set
+				print no_of_overlappings
+				break
+				"""
+				overlapping_ratio = float(no_of_overlappings)/len(vertex_set|target_set)
+				overlapping_ratio_left = float(no_of_overlappings)/len(vertex_set)
+				overlapping_ratio_right = float(no_of_overlappings)/len(target_set)
+				if no_of_overlappings >= threshold and overlapping_ratio_left>=left_cutoff and overlapping_ratio_right>=right_cutoff:
+					no_of_hits += 1
+					writer.writerow([overlapping_ratio, overlapping_ratio_left, overlapping_ratio_right, no_of_overlappings, id, i])
+			counter+= 1
+			#break
+			if counter%1000==0:
+				sys.stderr.write("%s%s/%s"%('\x08'*20, counter, no_of_hits))
+		curs.execute("fetch 5000 from crs")
+		rows = curs.fetchall()
+		#break
+	curs.execute("close crs")
+	del writer
+	sys.stderr.write("Done.\n")
+
+
 """
 #01-03-06 for easy console
 import sys, os, math
