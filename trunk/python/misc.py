@@ -666,7 +666,7 @@ def cluster_id_size_list_from_good_cl_table(input_fname, hostname='zhoudb', dbna
 
 """
 10-03-05
-	the most orginal data before prediciton
+	the most orginal data before prediction
 """
 def cluster_id_size_list_from_mcl_table(input_fname, hostname='zhoudb', dbname='graphdb', schema='sc_new_38'):
 	from sets import Set
@@ -2720,10 +2720,10 @@ def unknown_gene_set_from_gene_p_table(curs, p_gene_table, gene_p_table):
 """
 11-27-05
 """
-def get_gene2freq_from_prediction_pair2freq(prediciton_pair2freq):
+def get_gene2freq_from_prediction_pair2freq(prediction_pair2freq):
 	gene2freq = {}
-	for prediciton_pair, freq in prediciton_pair2freq.iteritems():
-		gene_no, go_no = prediciton_pair
+	for prediction_pair, freq in prediction_pair2freq.iteritems():
+		gene_no, go_no = prediction_pair
 		if gene_no not in gene2freq:
 			gene2freq[gene_no] = 0
 		if freq>gene2freq[gene_no]:
@@ -4197,44 +4197,57 @@ def draw_pattern_tf_info(curs, pattern_table, condition, gene_id2mt_no_set, min_
 	for Jasmine's collaborator, Mike West's request
 """
 def get_E2F_Y_target_list(input_fname):
+	"""
+	2006-08-23
+		add co_factor
+	"""
 	import string
 	inf = open(input_fname)
 	E2F_Y_target_list = []
 	for line in inf:
-		if line[0] == 'A':
+		if line[0] == 'Y':
+			co_factor = line[:-1].split(' = ')[1]
+			co_factor = co_factor.strip()
+		elif line[0] == 'A':
 			target_ls = line[:-1].split(' = ')[1]
 			target_ls = target_ls.split(', ')
 			target_ls = map(string.strip, target_ls)
-			E2F_Y_target_list.append(target_ls)
+			E2F_Y_target_list.append([co_factor, target_ls])
 	del inf
 	return E2F_Y_target_list
 
+
 def calculate_overlapping_E2F_Y_target_list(curs, pattern_table, E2F_Y_target_list, \
-		gene_symbol2gene_id, output_fname, threshold=4, left_cutoff=0.4, right_cutoff=0.4):
+		gene_symbol2gene_id, gene_id2gene_symbol, output_fname, threshold=4, left_cutoff=0.4, right_cutoff=0.4):
+	"""
+	2006-08-23
+		take patterns whose overlapping_ratio_left is 1.0
+	"""
 	sys.stderr.write("Calculating overlapping_E2F_Y_target_set_list...\n")
 	from sets import Set
 	from codense.common import dict_map
 	import csv
-	writer = csv.writer(open(output_fname, 'w'), delimiter='\t')
-	header = ['overlapping_ratio', 'overlapping_ratio_left(pattern)', 'overlapping_ratio_right(target_set)', \
-		'no_of_overlappings', 'pattern_id', 'target_set id']
-	writer.writerow(header)
+	#writer = csv.writer(open(output_fname, 'w'), delimiter='\t')
+	#header = ['overlapping_ratio', 'overlapping_ratio_left(pattern)', 'overlapping_ratio_right(target_set)', \
+	#	'no_of_overlappings', 'pattern_id', 'target_set id']
+	#writer.writerow(header)
 	curs.execute("DECLARE crs CURSOR FOR select id, vertex_set \
 		from %s"%(pattern_table))
 	curs.execute("fetch 5000 from crs")
 	rows = curs.fetchall()
 	no_of_hits = 0
 	counter = 0
+	target_ls_index2sub_patterns = {}
 	while rows:
 		for row in rows:
 			id = row[0]
-			vertex_set = row[1][1:-1].split(',')
-			vertex_set = map(int, vertex_set)
-			vertex_set = Set(vertex_set)
+			vertex_ls = row[1][1:-1].split(',')
+			vertex_ls = map(int, vertex_ls)
+			vertex_set = Set(vertex_ls)
 			for i in  range(len(E2F_Y_target_list)):
-				target_ls = E2F_Y_target_list[i]
-				target_ls = dict_map(gene_symbol2gene_id, target_ls)
-				target_set = Set(target_ls)
+				co_factor,  target_ls = E2F_Y_target_list[i]
+				target_ls_gene_id = dict_map(gene_symbol2gene_id, target_ls)
+				target_set = Set(target_ls_gene_id)
 				no_of_overlappings = len(vertex_set & target_set)
 				"""
 				print target_set
@@ -4245,9 +4258,13 @@ def calculate_overlapping_E2F_Y_target_list(curs, pattern_table, E2F_Y_target_li
 				overlapping_ratio = float(no_of_overlappings)/len(vertex_set|target_set)
 				overlapping_ratio_left = float(no_of_overlappings)/len(vertex_set)
 				overlapping_ratio_right = float(no_of_overlappings)/len(target_set)
-				if no_of_overlappings >= threshold and overlapping_ratio_left>=left_cutoff and overlapping_ratio_right>=right_cutoff:
+				#if no_of_overlappings >= threshold and overlapping_ratio_left>=left_cutoff and overlapping_ratio_right>=right_cutoff:
+				if overlapping_ratio_left==1.0:
 					no_of_hits += 1
-					writer.writerow([overlapping_ratio, overlapping_ratio_left, overlapping_ratio_right, no_of_overlappings, id, i])
+					if i not in target_ls_index2sub_patterns:
+						target_ls_index2sub_patterns[i] = []
+					target_ls_index2sub_patterns[i].append([id, vertex_ls])
+					#writer.writerow([overlapping_ratio, overlapping_ratio_left, overlapping_ratio_right, no_of_overlappings, id, i])
 			counter+= 1
 			#break
 			if counter%1000==0:
@@ -4256,8 +4273,173 @@ def calculate_overlapping_E2F_Y_target_list(curs, pattern_table, E2F_Y_target_li
 		rows = curs.fetchall()
 		#break
 	curs.execute("close crs")
-	del writer
+	outf = open(output_fname, 'w')
+	for target_ls_index in target_ls_index2sub_patterns:
+		co_factor,  target_ls = E2F_Y_target_list[target_ls_index]
+		outf.write('Y = %s\n'%co_factor)
+		outf.write('A = %s\n'%(', '.join(target_ls)))
+		for id, vertex_ls in target_ls_index2sub_patterns[target_ls_index]:
+			outf.write('P(%s) = %s\n'%(id, ', '.join(dict_map(gene_id2gene_symbol, vertex_ls))))
+		outf.write('\n')
+	del outf
 	sys.stderr.write("Done.\n")
+
+
+def wrap_E2F_functions(input_fname, curs, pattern_table, \
+		output_fname, tax_id=9606, threshold=4, left_cutoff=0.4, right_cutoff=0.4):
+	""" 
+	2006-08-23
+		wrap functions above together
+	"""
+	from codense.common import get_gene_id2gene_symbol, get_gene_symbol2gene_id
+	gene_symbol2gene_id = get_gene_symbol2gene_id(curs, tax_id)
+	gene_id2gene_symbol = get_gene_id2gene_symbol(curs, tax_id)
+	E2F_Y_target_list = get_E2F_Y_target_list(input_fname)
+	calculate_overlapping_E2F_Y_target_list(curs, pattern_table, E2F_Y_target_list, \
+		gene_symbol2gene_id, gene_id2gene_symbol, output_fname)
+
+
+"""
+2006-08-24
+	get the relationship between (predicted times) vs accuracy
+2006-08-31
+	read the output of parse_haifeng_markov()
+"""
+def plot_prediction_times_vs_accuracy(input_fname, output_fname, prediction_times_threshold=6, known_or_unknown_type=1):
+	#get data from haifeng's pred.sh output file, like human.100.known1.2
+	inf = open(input_fname, 'r')
+	prediction2prediction_times = {}
+	for line in inf:
+		row =  line[:-1].split()
+		gene_id, pattern_id, go_id, is_known, is_correct, markov_score, p_value = row
+		#row = tuple(map(int, row))	#format of row: gene_no, go_no, is_correct
+		gene_id = int(gene_id)
+		is_known = int(is_known)
+		is_correct = int(is_correct)
+		if is_known==known_or_unknown_type:
+			row = (gene_id, go_id, is_correct)
+			if row not in prediction2prediction_times:
+				prediction2prediction_times[row] = 0
+			prediction2prediction_times[row] += 1
+	del inf
+	#get the equal_count range
+	import rpy
+	rpy.r.library('lattice')
+	rpy.set_default_mode(rpy.NO_CONVERSION)
+	prediction_times_equal_count_object = rpy.r.equal_count(prediction2prediction_times.values())
+	rpy.set_default_mode(rpy.BASIC_CONVERSION)
+	prediction_times_range_list = rpy.r.levels(prediction_times_equal_count_object)
+	prediction_times_range_list = map(tuple, prediction_times_range_list)
+	print "prediction_times range:", prediction_times_range_list
+	
+	#put predictions into different ranges
+	#count predictions over a prediction_times_threshold
+	prediction_times_range2stat = {}
+	prediction_times_is_correct_ls = []
+	no_of_right_predictions = 0
+	no_of_total_predictions = 0
+	from sets import Set
+	genes_predicted_set = Set()
+	
+	for prediction_tuple, prediction_times in prediction2prediction_times.iteritems():
+		prediction_times_is_correct_ls.append([prediction_times, prediction_tuple[-1]])
+		for prediction_times_range in prediction_times_range_list:
+			if prediction_times>=prediction_times_range[0] and prediction_times<=prediction_times_range[1]:
+				if prediction_times_range not in prediction_times_range2stat:
+					prediction_times_range2stat[prediction_times_range] = [0, 0]
+				prediction_times_range2stat[prediction_times_range][prediction_tuple[-1]] += 1
+		if prediction_times>=prediction_times_threshold:
+			no_of_right_predictions += prediction_tuple[-1]
+			no_of_total_predictions += 1
+			genes_predicted_set.add(prediction_tuple[0])
+	
+	accuracy = no_of_right_predictions/float(no_of_total_predictions)
+	print "prediction_times_threshold: %s, #genes: %s, #right predictions: %s, #total predictions: %s, accuracy: %s\n"\
+		%(prediction_times_threshold, len(genes_predicted_set), no_of_right_predictions, no_of_total_predictions, accuracy)
+	"""
+	#also count predictions over a prediction_times_threshold, not necessary anymore
+	prediction_times_is_correct_ls.sort()
+	import Numeric
+	prediction_times_is_correct_array = Numeric.array(prediction_times_is_correct_ls)
+	
+	for i in range(len(prediction_times_is_correct_array)):
+		if prediction_times_is_correct_array[i][0]>=prediction_times_threshold:
+			no_of_right_predictions = sum(prediction_times_is_correct_array[i:, 1])
+			no_of_total_predictions = len(prediction_times_is_correct_array[i:, 1])
+			accuracy = no_of_right_predictions/float(no_of_total_predictions)
+			print "prediction_times_threshold: %s, #right predictions: %s, #total predictions: %s, accuracy: %s\n"%(prediction_times_threshold,\
+				no_of_right_predictions, no_of_total_predictions, accuracy)
+			break
+	print prediction_times_range2stat
+	"""
+	
+	#draw the plot
+	
+	#import rpy
+	#rpy.r.png(output_fname)
+	import pylab
+	prediction_times_list = []
+	accuracy_list = []
+	for prediction_times_range, wrong_correct_tuple in prediction_times_range2stat.iteritems():
+		prediction_times_list.append(sum(prediction_times_range)/2.0)
+		accuracy_list.append(float(wrong_correct_tuple[1])/sum(wrong_correct_tuple))
+	#rpy.r.plot(prediction_times_list, accuracy_list, xlab='prediction_times', ylab='accuracy', type='p')
+	#rpy.r.dev_off()
+	pylab.xlabel("prediction times")
+	pylab.ylabel("accuracy")
+	import os
+	pylab.title(os.path.basename(input_fname))
+	pylab.plot(prediction_times_list, accuracy_list, 'bo')
+	pylab.show()
+	return genes_predicted_set
+
+
+"""
+2006-08-29
+	parse haifeng's markov.py's output file and output 
+"""
+def parse_haifeng_markov(markov_output_fname, go_fname, output_fname, score_cutoff, p_value_cut_off=0.01):
+	sys.stderr.write("Getting go_index2id...")
+	go_inf = open(go_fname)
+	go_id_line = go_inf.readline()
+	go_id_list = go_id_line.split()
+	del go_inf
+	no_of_gos = len(go_id_list)
+	go_index2id = dict(zip(range(no_of_gos), go_id_list))
+	sys.stderr.write("Done.\n")
+	
+	import csv
+	reader = csv.reader(open(markov_output_fname), delimiter='\t')
+	writer = csv.writer(open(output_fname, 'w'), delimiter='\t')
+	sys.stderr.write("Reading %s...\n"%markov_output_fname)
+	counter = 0
+	no_of_hits = 0
+	for row in reader:
+		pattern_id, unknown_percentage, no_of_vertices, no_of_edges, avg_degree, density, supports, vertex_id, \
+		is_known, unknown_neighbor_perc, degree, no_of_neighbors = row[:12]
+		go_binary_list = row[12:12+no_of_gos*1]
+		m1_list = row[12+no_of_gos*1:12+no_of_gos*2]
+		p_value_list =row[12+no_of_gos*2:12+no_of_gos*3]
+		"""
+		m0_list = row[12+no_of_gos*2:12+no_of_gos*3]
+		mu_list = row[12+no_of_gos*3:12+no_of_gos*4]
+		p_value_list = row[12+no_of_gos*4:12+no_of_gos*5]
+		"""
+		m1_list = map(float, m1_list)
+		p_value_list = map(float, p_value_list)
+		
+		counter += 1
+		for i in range(no_of_gos):
+			if p_value_list[i]<p_value_cut_off and m1_list[i]>0 and m1_list[i]>score_cutoff:
+				writer.writerow([vertex_id, pattern_id, go_index2id[i], is_known, go_binary_list[i], m1_list[i], p_value_list[i]])
+				no_of_hits += 1
+		if counter%1000==0:
+			sys.stderr.write('%s\t%s\t%s'%('\x08'*20, counter, no_of_hits))
+	sys.stderr.write('%s\t%s\t%s\n'%('\x08'*20, counter, no_of_hits))
+	
+	del reader, writer
+	sys.stderr.write("Done.\n")
+	
 
 
 """
@@ -4384,7 +4566,7 @@ if __name__ == '__main__':
 	filter_cluster_bs_table(curs, schema_instance.cluster_bs_table, schema_instance.good_bs_table, top_number, commit_bit)
 	"""
 	
-	###10-31-05 following is for global pleiotropy of one prediciton setting
+	###10-31-05 following is for global pleiotropy of one prediction setting
 	
 	import sys,os
 	sys.path += [os.path.expanduser('~/script/annot/bin')]
