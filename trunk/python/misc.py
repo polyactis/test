@@ -4400,6 +4400,7 @@ def plot_prediction_times_vs_accuracy(input_fname, output_fname, prediction_time
 """
 def parse_haifeng_markov(markov_output_fname, go_fname, output_fname, score_cutoff, p_value_cut_off=0.01):
 	sys.stderr.write("Getting go_index2id...")
+	import Numeric as numpy
 	go_inf = open(go_fname)
 	go_id_line = go_inf.readline()
 	go_id_list = go_id_line.split()
@@ -4428,11 +4429,14 @@ def parse_haifeng_markov(markov_output_fname, go_fname, output_fname, score_cuto
 		m1_list = map(float, m1_list)
 		p_value_list = map(float, p_value_list)
 		
+		go_index_with_highest_score = numpy.argmax(m1_list)
+		
 		counter += 1
-		for i in range(no_of_gos):
-			if p_value_list[i]<p_value_cut_off and m1_list[i]>0 and m1_list[i]>score_cutoff:
-				writer.writerow([vertex_id, pattern_id, go_index2id[i], is_known, go_binary_list[i], m1_list[i], p_value_list[i]])
-				no_of_hits += 1
+		#for i in range(no_of_gos):
+		i = go_index_with_highest_score
+		if p_value_list[i]<p_value_cut_off and m1_list[i]>0 and m1_list[i]>score_cutoff:
+			writer.writerow([vertex_id, pattern_id, go_index2id[i], is_known, go_binary_list[i], m1_list[i], p_value_list[i]])
+			no_of_hits += 1
 		if counter%1000==0:
 			sys.stderr.write('%s\t%s\t%s'%('\x08'*20, counter, no_of_hits))
 	sys.stderr.write('%s\t%s\t%s\n'%('\x08'*20, counter, no_of_hits))
@@ -4441,7 +4445,41 @@ def parse_haifeng_markov(markov_output_fname, go_fname, output_fname, score_cuto
 	sys.stderr.write("Done.\n")
 	
 
-
+"""
+2006-08-31
+"""
+def masked_prom_seq2db(curs, input_dir, prom_seq_table='transfac.prom_seq', need_commit = 0):
+	sys.stderr.write("Submitting masked prom_seq ...\n")
+	sys.path.insert(0, os.path.join(os.path.expanduser('~/script/transfac/src')))
+	from transfacdb import fasta_block_iterator
+	import cStringIO
+	for input_fname in os.listdir(input_dir):
+		if input_fname.find('masked')==-1:
+			continue
+		print input_fname
+		input_fname = os.path.join(input_dir, input_fname)
+		inf = open(input_fname)
+		iter = fasta_block_iterator(inf)
+		block_no = 0
+		curs.execute("begin")
+		for block in iter:
+			block = cStringIO.StringIO(block)
+			header_line = block.readline()
+			id = header_line[1:-1]	#no need to convert it to integer
+			sequence = ''
+			for line in block:
+				sequence += line[:-1]
+			curs.execute("update %s set masked_seq='%s' where id=%s"%(prom_seq_table, sequence, id))
+			block_no += 1
+			if block_no%500==0:
+				sys.stderr.write('%s%s'%('\x08'*20, block_no))
+		if need_commit:
+			curs.execute("end")
+		del inf, iter
+	sys.stderr.write('%s%s'%('\x08'*20, block_no))
+	sys.stderr.write("Done.\n")
+	
+	
 """
 #01-03-06 for easy console
 import sys, os, math
@@ -4466,6 +4504,9 @@ if __name__ == '__main__':
 	from codense.common import db_connect, form_schema_tables
 	hostname='zhoudb'
 	dbname='graphdb'
+	conn, curs = db_connect(hostname, dbname)
+	masked_prom_seq2db(curs, '/home/cmb-01/yuhuang/transfac/prom_seq_mm_masked', 'transfac.prom_seq', need_commit = 1)
+	
 	#### following codes find patterns given go_no_list
 	"""
 	if len(sys.argv)==1:
@@ -4482,7 +4523,7 @@ if __name__ == '__main__':
 	conn, curs = db_connect(hostname, dbname, schema)
 	find_patterns_given_go_no_set(curs, schema_instance, given_go_no_set, pic_output_dir)
 	"""
-	
+	"""
 	#11-02-05 following is to give pleiotropy overview(AS events)
 	
 	if len(sys.argv)==1:
@@ -4553,7 +4594,7 @@ if __name__ == '__main__':
 	
 	
 	#11-01-05 following is used to filter cluster_bs_table
-	"""
+	
 	if len(sys.argv)==1:
 		print "Usage: misc.py schema input_fname lm_bit acc_cut_off top_number commit_bit"
 		sys.exit(0)
@@ -4564,7 +4605,7 @@ if __name__ == '__main__':
 	schema_instance = form_schema_tables(input_fname, acc_cut_off, lm_bit)
 	conn, curs = db_connect(hostname, dbname, schema)
 	filter_cluster_bs_table(curs, schema_instance.cluster_bs_table, schema_instance.good_bs_table, top_number, commit_bit)
-	"""
+	
 	
 	###10-31-05 following is for global pleiotropy of one prediction setting
 	
@@ -4608,3 +4649,4 @@ if __name__ == '__main__':
 			no_of_p_funcs2no_of_genes[no_of_p_funcs].add(gene_no)
 		import cPickle
 		cPickle.dump(no_of_p_funcs2no_of_genes, open(outputfname, 'w'))
+		"""
