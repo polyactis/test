@@ -4479,7 +4479,81 @@ def masked_prom_seq2db(curs, input_dir, prom_seq_table='transfac.prom_seq', need
 	sys.stderr.write('%s%s'%('\x08'*20, block_no))
 	sys.stderr.write("Done.\n")
 	
+
+"""
+2006-09-05
+	codes below are trying to compare the histograms of correlations 
+		of edges which are within one node, between this node and other nodes,
+		and edges totally outside
+"""
+def get_go_id2gene_set(go_fname):
+	sys.stderr.write("Getting go_id2gene_set...")
+	import csv
+	from sets import Set
+	reader = csv.reader(open(go_fname), delimiter='\t')
+	go_id2gene_set = {}
+	for row in reader:
+		go_id, go_name, gene_id = row
+		gene_id = int(gene_id)
+		if go_id not in go_id2gene_set:
+			go_id2gene_set[go_id] = Set()
+		go_id2gene_set[go_id].add(gene_id)
+	del reader
+	sys.stderr.write("Done.\n")
+	return go_id2gene_set
+
+def get_gene_pair_cor_list(cor_fname):
+	sys.stderr.write("Getting gene_pair_cor_list...")
+	import csv
+	reader = csv.reader(open(cor_fname), delimiter='\t')
+	reader.next()	#skip the first line
+	gene_pair_cor_list = []
+	for row in reader:
+		edge_tag, gene_id1, gene_id2, cor= row
+		gene_id1 = int(gene_id1)
+		gene_id2 = int(gene_id2)
+		cor = float(cor)
+		gene_pair_cor_list.append([gene_id1, gene_id2, cor])
+	del reader
+	sys.stderr.write("Done.\n")
+	return gene_pair_cor_list
+
+def go_correlation_coherence(cor_fname, go_fname, output_dir):
+	import os, sys
+	import pylab
+	import matplotlib
+	matplotlib.use('Agg') 
+	go_id2gene_set = get_go_id2gene_set(go_fname)
+	gene_pair_cor_list = get_gene_pair_cor_list(cor_fname)
+	counter = 0
+	for go_id, gene_set in go_id2gene_set.iteritems():
+		intra_cor_list = []
+		inter_cor_list = []
+		extra_cor_list = []
+		for row in gene_pair_cor_list:
+			gene_id1, gene_id2, cor= row
+			if (gene_id1 in gene_set) and (gene_id2 in gene_set):
+				intra_cor_list.append(cor)
+			elif (gene_id1 in gene_set) and (gene_id2 not in gene_set):
+				inter_cor_list.append(cor)
+			elif (gene_id1 not in gene_set) and (gene_id2 in gene_set):
+				inter_cor_list.append(cor)
+			elif (gene_id1 not in gene_set) and (gene_id2 not in gene_set):
+				extra_cor_list.append(cor)
+		counter += 1
+		pylab.figure(counter)
+		if intra_cor_list:
+			pylab.hist(intra_cor_list)
+		if inter_cor_list:
+			pylab.hist(inter_cor_list)
+		if extra_cor_list:
+			pylab.hist(extra_cor_list)
+		pylab.title('go_id: %s'%go_id)
+		fig_fname = '%s_go_id_%s.png'%(cor_fname, go_id)
+		print fig_fname
+		pylab.savefig(os.path.join(output_dir,fig_fname))
 	
+
 """
 #01-03-06 for easy console
 import sys, os, math
