@@ -1,0 +1,67 @@
+\documentclass[a4paper,10pt]{article}
+\usepackage[dvips]{color,graphicx}
+\usepackage[dvips, bookmarks, colorlinks=false]{hyperref}
+
+%opening
+\title{Math650 Homework 2}
+\author{Yu Huang}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+Matrix
+\end{abstract}
+
+\section{Introduction}
+Generate a matrix and apply some operations.
+
+\section{Methods}
+Open R and type commands. Code see Appendix~\ref{appendix}.
+
+\section{Results}
+
+
+Generate a 4 by 6 matrix X whose entries are independent and identically distributed random numbers following a N(2,4) distribution.
+\begin{verbatim}
+> norm_randm_list = rnorm(24, 2, 4)
+> norm_random_list
+ [1]  4.0030321 -0.6414714 -5.4938659  0.5669581  5.8582990  0.7107656
+ [7]  5.3922975 -3.6034697  7.3891580  6.8106063  0.7573053  2.3363219
+[13]  1.8553793  5.8996918  6.4083927 -8.0716747  7.0565890 -0.6418736
+[19]  4.4272155  1.4212740  3.9231919  1.7940718 -2.2095192 13.1798591
+> X = matrix(norm_random_list, 4,6)
+> X
+           [,1]       [,2]      [,3]      [,4]       [,5]      [,6]
+[1,]  4.0030321  5.8582990 7.3891580  1.855379  7.0565890  3.923192
+[2,] -0.6414714  0.7107656 6.8106063  5.899692 -0.6418736  1.794072
+[3,] -5.4938659  5.3922975 0.7573053  6.408393  4.4272155 -2.209519
+[4,]  0.5669581 -3.6034697 2.3363219 -8.071675  1.4212740 13.179859
+\end{verbatim}
+
+Calculate column means for matrix X.
+\begin{verbatim}
+> apply(X, 2, mean)
+[1] -0.3913367  2.0894731  4.3233479  1.5229473  3.0658012  4.1719009
+\end{verbatim}
+
+Calculate the standard deviation of the column means.
+\begin{verbatim}
+> sd(apply(X, 2, mean))
+[1] 1.7841
+\end{verbatim}
+
+\section{Conclusions and discussion}
+Deviations are pretty big and the column means are substantially away from 2. High level functions of R make things easy.
+
+\section{Appendix}
+\label{appendix}
+\begin{verbatim}
+norm_randm_list = rnorm(24, 2, 4)
+X = matrix(norm_random_list, 4,6)
+apply(X, 2, mean)
+sd(apply(X, 2, mean))
+\end{verbatim}
+
+\end{document}

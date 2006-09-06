@@ -1,51 +1,3 @@
-\documentclass[a4paper,10pt]{article}
-\usepackage[dvips]{color,graphicx}
-\usepackage[dvips, bookmarks, colorlinks=false]{hyperref}
-
-%opening
-\title{Math650 Homework 1}
-\author{Yu Huang}
-
-\begin{document}
-
-\maketitle
-
-\begin{abstract}
-Get familiar with R
-\end{abstract}
-
-\section{Introduction}
-R is an important statistical software that we need to get familiar with.
-
-\section{Methods}
-Open an R session in a console and type commands of Chapter 1 of \emph{Modern Applied Statistics with  S} by Venables and Ripley, 4th Edition.
-
-\section{Results}
-
-
-This is a trial session and results are trivial. So just pick one of the nice plots(Figure~\ref{f1}). R codes are appended.
-
-
-One thing to take notice is that R and S are slightly different. As the book was catered towards S, some errors come up while i was using R.
-\begin{enumerate}
-\item No \emph{std.dev}, while \emph{sd} could substitute it.
-\item No \emph{.object} such as \emph{lm.object}.
-\item Mostly \emph{$<-$} is same as \emph{=}. But not in \emph{contour(dd$<-$kde2d(x,y)}.
-\item The pairwise scatterplot function \emph{brush()} is not available in R.
-\end{enumerate}
-
-
-
-\begin{figure}
-\includegraphics[angle=-90, width=1\textwidth]{figures/hw1_fig1.eps}
-\caption{a simple linear regression plot}\label{f1}
-\end{figure}
-
-\section{Conclusion and discussion}
-S and R have minor differences that are tricky under certain scenario. Plotting is quite easy in R.
-
-\section{Appendix}
-\begin{verbatim}
 library(MASS)
 
 #objects() is same as ls()
@@ -184,6 +136,3 @@ rm(fm, fm0)
 1-pf(4.3781, 4,76)
 qf(0.95,4, 76)
 q()
-\end{verbatim}
-
-\end{document}
