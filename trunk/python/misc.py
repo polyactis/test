@@ -4519,6 +4519,10 @@ def get_gene_pair_cor_list(cor_fname):
 	return gene_pair_cor_list
 
 def go_correlation_coherence(cor_fname, go_fname, output_dir):
+	"""
+	2006-09-06
+		use subplot() to separate three histograms
+	"""
 	import os, sys
 	import pylab
 	import matplotlib
@@ -4542,13 +4546,22 @@ def go_correlation_coherence(cor_fname, go_fname, output_dir):
 				extra_cor_list.append(cor)
 		counter += 1
 		pylab.figure(counter)
+		
+		pylab.subplot(311)
+		pylab.title('Intra node')
 		if intra_cor_list:
 			pylab.hist(intra_cor_list)
+		
+		pylab.subplot(312)
+		pylab.title('inter node')
 		if inter_cor_list:
 			pylab.hist(inter_cor_list)
+		
+		pylab.subplot(313)
+		pylab.title('extra node')
 		if extra_cor_list:
 			pylab.hist(extra_cor_list)
-		pylab.title('go_id: %s'%go_id)
+		pylab.xlabel('go_id: %s'%go_id)
 		fig_fname = '%s_go_id_%s.png'%(cor_fname, go_id)
 		print fig_fname
 		pylab.savefig(os.path.join(output_dir,fig_fname))
