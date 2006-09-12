@@ -1,0 +1,77 @@
+\documentclass[a4paper,10pt]{article}
+
+
+%opening
+\title{Math650 Homework 3.2}
+\author{Yu Huang}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+Speed Limits and Traffic Fatalities
+\end{abstract}
+
+\section{Introduction}
+Here we investigate the question whether the increase of speed limits caused the traffic fatalities to increase.
+
+\section{Materials and Methods}
+Question Chap2 No23, Data from its CDROM and R software.
+
+
+\section{Results}
+Sample 1 is percentage change data of states which increased speed limits. Sample 2 is data of states which didn't change speed limits.
+
+Result Table
+\begin{tabular}{|r|r|}
+\hline
+mean of sample 1 & 13.75312\\
+mean of sample 2 & -8.563158\\
+mean difference & 22.31628\\
+sd of sample 1& 21.33285\\
+sd of sample 2& 31.00085\\
+degrees of freedom of pooled sd & 49\\
+pooled sd & 25.31707\\
+standard error for the difference & 7.33241\\
+t statistic & 3.043513\\
+p-value of t statistic & 0.001876831\\
+\hline
+\end{tabular}
+
+All R codes are appended(\ref{appendix}).
+
+\section{Conclusion and Discussion}
+Here there's neither random selection nor random allocation of units to groups. We can't directly say there's a strong causal relationship between speed limits and traffic fatalities. However, based on the tiny p-value(0.001876831), the actual data differs substantially from the expected outcome under the model which assumes no increase of traffic fatalities after increasing speed limits.
+
+\section{Appendix}
+\label{appendix}
+function \emph{t\_test\_func} is same as in math650\_hw3\_1.
+\begin{verbatim}
+#chap 2, No23
+data = read.csv("/usr/local/doc/statistical_sleuth/ASCII/ex0223.csv")
+sample_data1 = data[data$INCREASe=="Yes",]$FATALITIESCHANGE
+sample_data2 = data[data$INCREASe=="No",]$FATALITIESCHANGE
+t_test_func(sample_data1, sample_data2)
+\end{verbatim}
+
+Output is this (disregarding those lines with df=12):
+\begin{verbatim}
+mean_f: 13.75312
+mean_r: -8.563158
+mean difference: 22.31628
+sd_f: 21.33285
+sd_r: 31.00085
+degrees_of_freedom_of_pooled_sd: 49
+pooled_sd: 25.31707
+standard_error_for_the_difference: 7.33241
+percentile_97_5th, df=12: 2.179
+conf_interv_of_difference_of_mu_lower, df=12: 6.338962
+conf_interv_of_difference_of_mu_upper, df=12: 38.2936
+t_stat: 3.043513
+percentile_97_5th: 2.009575
+conf_interv_of_difference_of_mu_lower: 7.581254
+conf_interv_of_difference_of_mu_upper: 37.05131
+p-value of t_stat 0.001876831
+\end{verbatim}
+\end{document}
