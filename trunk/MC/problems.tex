@@ -5,7 +5,7 @@
 \makeindex
 
 %opening
-\title{Problems of Monte Carlo Strategies in Scientific Computing}
+\title{Problems of Monte Carlo}
 \author{Yu Huang}
 
 \begin{document}
@@ -13,11 +13,16 @@
 \maketitle
 
 \begin{abstract}
-This is a collection of solutions and notes of the book written by Jun S. Liu.
+This is a collection of solutions and notes of two books,
+\begin{itemize}
+\item \emph{Monte Carlo Strategies in Scientific Computing} written by Jun S. Liu
+\item \emph{Monte Carlo Statistical Methods} 2nd Edition, by Christian P. Robert and George Casella
+\end{itemize}
 \end{abstract}
+
 \tableofcontents
 
-\section{problems of Chapter 2}
+\section{problems of Chapter 2 of book by Jun S. Liu}
 \subsection{problem 2.1}
 
 \begin{eqnarray*}
@@ -77,6 +82,16 @@ M-step: let partial derivatures $\frac{\partial Q(\theta | \theta^{(t)}, y_{obs}
 r & = & \frac{\sum_i \tau_i}{n} \\
 \frac{\partial Q(\theta | \theta^{(t)}, y_{obs} ) } {\partial p_m } & = & \frac{\sum_i y_i\tau_i^m (1-\tau_i)^{(1-m)} }{p_m} - \frac{\sum_i (1-y_i)\tau_i^m (1-\tau_i)^{(1-m)}}{(1-p_m)} = 0 \nonumber \\
 p_m & = & \frac{\sum_i y_i \tau_i^m (1-\tau_i)^{(1-m)} }{ \sum_i \tau_i^m (1-\tau_i)^{(1-m)} }
+\end{eqnarray}
+
+\section{problems of Robert's book}
+\subsection{problem 3.3, page 111}
+It's only about part a. check page 84 and 85. The variance of the simulation is $v_n = \Phi(t)(1-\Phi(t))/n$, based on CLT, we have confidence $(1-\alpha)$, that the true value falls into range $\bar{h_n} \pm n_\alpha*\sqrt{v_n}$. $n_\alpha$ is the quantile corresponding to p-value $\alpha$. In this problem, to achieve three digits of accuracy with probability .95,
+\begin{eqnarray}
+\Phi(t) = 0.006209665 \nonumber \\
+\alpha = 0.05 \nonumber \\
+n_\alpha = 1.959964 \nonumber \\
+n = n_\alpha^2 * 10^8 * Phi(t)(1-\Phi(t)) = 2370605 \nonumber
 \end{eqnarray}
 
 \end{document}

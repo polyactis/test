@@ -13,6 +13,7 @@ Examples:
 	Problems from Monte Carlo Statiscal Methods, 2nd Edition, Christian Robert, George Casella
 1: Problem2_2
 2: Problem2_3
+3: Problem3_3
 """
 import sys, os, math
 bit_number = math.log(sys.maxint)/math.log(2)
@@ -83,6 +84,27 @@ class Problem2_3(unittest.TestCase):
 		l = pylab.plot(bins, y, 'ro-', linewidth=2)
 		pylab.show()
 
+class Problem3_3(unittest.TestCase):
+	"""
+	2006-09-13
+	"""
+	def test_pro3_3_part_a(self, no_of_samples=10e7):
+		print
+		t_value = 2.5
+		import rpy
+		print 'P(x>%s) from R is %s'%(t_value, rpy.r.pnorm(t_value, lower_tail=rpy.r.FALSE))
+		import random, sys
+		cum_sum = 0.0
+		i = 0
+		prev_no_of_simulations = 1
+		while i <no_of_samples:
+			random_gauss = random.gauss(0,1)
+			cum_sum += int(random_gauss>t_value)
+			i += 1
+			if i/float(prev_no_of_simulations)==10:
+				prev_no_of_simulations = i
+				print i, cum_sum/i
+
 if __name__ == '__main__':
 	if len(sys.argv) == 1:
 		print __doc__
@@ -96,7 +118,8 @@ if __name__ == '__main__':
 		sys.exit(2)
 	
 	TestCaseDict = {1:Problem2_2,
-		2:Problem2_3}
+		2:Problem2_3,
+		3:Problem3_3}
 	type = 0
 	for opt, arg in opts:
 		if opt in ("-h", "--help"):
