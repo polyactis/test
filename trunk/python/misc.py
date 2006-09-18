@@ -4569,13 +4569,17 @@ def go_correlation_coherence(cor_fname, go_fname, output_dir):
 
 """
 2006-09-12
+	draw a graph , with nodes as GO node,  size proportional to how many genes it has,
+		edge due to sharing of genes between GO nodes, edge width proportional to how many
+		genes are shared
 	
 	call get_go_id2gene_set() from upstairs
 """
-def draw_GO_informative_node_structure_graph(go_fname, fig_output_fname, sharing_threshold=30):
-	go_id2gene_set = get_go_id2gene_set(go_fname)
+def draw_GO_node_structure_graph(go_id2gene_set, fig_output_fname, sharing_threshold=30, label_map=None, is_to_show=1):
+	sys.stderr.write("Drawing GO node structure graph...")
 	import networkx as nx
 	import pylab
+	pylab.clf()	#clear the figure
 	g = nx.XGraph()
 	go_id_list = go_id2gene_set.keys()
 	no_of_go_ids = len(go_id_list)
@@ -4593,7 +4597,7 @@ def draw_GO_informative_node_structure_graph(go_fname, fig_output_fname, sharing
 	for v in g:
 		node_size_list.append(len(go_id2gene_set[v])*4)
 	pos=nx.graphviz_layout(g)
-	pylab.figure(1, figsize=(25,25))
+	pylab.figure(1, figsize=(250,250))
 	nx.draw_networkx_edges(g,pos,
 		alpha=0.3,
 		width=edge_width_list,
@@ -4607,9 +4611,162 @@ def draw_GO_informative_node_structure_graph(go_fname, fig_output_fname, sharing
 		node_size=0,
 		width=1,
 		edge_color='k')
-	nx.draw_networkx_labels(g, pos, fontsize=6)
-	pylab.title(go_fname)
-	pylab.savefig(fig_output_fname, dpi=75)
+	abr_label_map = {}
+	if label_map:
+		#don't give a dictionary with keys more than the nodes, (it'll get error)
+		for key in g:
+			if key in label_map:
+				abr_label_map[key] = label_map[key]
+	if abr_label_map:
+		nx.draw_networkx_labels(g, pos, abr_label_map, fontsize=6)
+	else:
+		nx.draw_networkx_labels(g, pos, fontsize=6)
+	#give a title
+	pylab.title(fig_output_fname)
+	#write the legend
+	xmin, xmax, ymin, ymax = pylab.axis()
+	dx = xmax - xmin
+	dy = ymax - ymin
+	x = 0.02*dx + xmin
+	y = 0.95*dy + ymin
+	pylab.text(x, y, "edge cutoff: %s"%sharing_threshold)
+	pylab.savefig(fig_output_fname, dpi=750)
+	if is_to_show:
+		pylab.show()
+	sys.stderr.write("Done.\n")
+
+def get_go_id2gene_set_from_prediction_cut_file(prediction_cut_fname):
+	"""
+	2006-09-13
+		prediction_cut_fname is output of PredictionAccCurve.py
+	"""
+	import sys
+	sys.stderr.write("Getting go_id2gene_set...")
+	import csv
+	reader = csv.reader(open(prediction_cut_fname), delimiter='\t')
+	from sets import Set
+	go_id2gene_set  = {}
+	for row in reader:
+		vertex_id, pattern_id, go_id, is_known, is_correct, m1_score, p_value = row
+		if go_id not in go_id2gene_set:
+			go_id2gene_set[go_id] = Set()
+		go_id2gene_set[go_id].add(int(vertex_id))
+	del reader
+	sys.stderr.write("Done.\n")
+	return go_id2gene_set
+
+
+def tss_cds_distance_histogram(curs, prom_seq_table, tax_id=9606, entrezgene_mapping_table='sequence.entrezgene_mapping', \
+		annot_assembly_table = 'sequence.annot_assembly'):
+	"""
+	2006-09-14
+		check how far between TSS and CDS
+	"""
+	from codense.common import pg_1d_array2python_ls
+	sys.stderr.write("Getting getting tss and cds info from database...\n")
+	curs.execute("DECLARE crs CURSOR FOR SELECT e.gene_id, e.mrna_start, e.cds_start\
+		from %s e where e.tax_id=%s"%(entrezgene_mapping_table, tax_id))
+	curs.execute("fetch 10000 from crs")
+	rows = curs.fetchall()
+	counter = 0
+	distance_ls = []
+	no_of_faraways = 0
+	while rows:
+		for row in rows:
+			gene_id, mrna_start, cds_start = row
+			if mrna_start and cds_start:
+				mrna_start = pg_1d_array2python_ls(mrna_start, int)
+				cds_start = pg_1d_array2python_ls(cds_start, int)
+				distance =  abs(mrna_start[0] - cds_start[0])
+				if distance<=10000:
+					distance_ls.append(distance)
+				else:
+					no_of_faraways +=1
+			counter += 1
+		sys.stderr.write("%s\t%s"%('\x08'*20, counter))
+		curs.execute("fetch 10000 from crs")
+		rows = curs.fetchall()
+	curs.execute("close crs")
+	print "no_of_faraways", no_of_faraways
+	sys.stderr.write("Done.\n")
+	import pylab
+	pylab.hist(distance_ls)
+	pylab.show()
+
+
+"""
+2006-09-17
+	list comparison based on  a specified location
+"""
+def list_compare(x, y, k):
+	if x[k]>y[k]:
+		return 1
+	elif x[k]==y[k]:
+		return 0
+	else: # x<y
+		return -1
+
+
+def printTF2pattern2geneInfo(curs, cluster_bs_table, mt_no2tf_name, output_fname):
+	"""
+	2006-09-17
+		print out a global picture of TF vs gene pattern information
+		
+		call list_compare() above
+	"""
+	from codense.common import pg_1d_array2python_ls
+	sys.stderr.write("Getting TF2pattern2geneInfo from database...\n")
+	curs.execute("DECLARE crs0 CURSOR FOR SELECT mcl_id, core_vertex_ls, bs_no_list, gene_no_list from %s"%\
+		(cluster_bs_table))
+	curs.execute("fetch 2000 from crs0")
+	rows = curs.fetchall()
+	counter = 0
+	tf2data = {}	#key is tf, value is a list, [#patterns, gene2freq]
+	while rows:
+		for row in rows:
+			mcl_id, core_vertex_ls, bs_no_list, gene_no_list = row
+			core_vertex_ls = pg_1d_array2python_ls(core_vertex_ls, int)
+			bs_no_list = pg_1d_array2python_ls(bs_no_list, int)
+			gene_no_list = pg_1d_array2python_ls(gene_no_list, int)
+			bs_no_list.sort()
+			key = tuple(bs_no_list)
+			if key not in tf2data:
+				tf2data[key] = [0, {}]
+			tf2data[key][0] += 1
+			for gene_no in gene_no_list:
+				if gene_no not in tf2data[key][1]:
+					tf2data[key][1][gene_no] = 0
+				tf2data[key][1][gene_no] += 1
+			counter += 1
+		sys.stderr.write("%s\t%s"%('\x08'*20, counter))
+		curs.execute("fetch 2000 from crs0")
+		rows = curs.fetchall()
+	curs.execute("close crs0")
+	sys.stderr.write("Done.\n")
+	
+	sys.stderr.write("Outputting data...")
+	tf_data_list = []
+	for tf, data in tf2data.iteritems():
+		gene_no2freq = data[1]
+		lambda_divid = lambda x: float(x)/data[0]
+		freq_list = map(lambda_divid, gene_no2freq.values())
+		no_of_genes = len(gene_no2freq)
+		avg_freq_per_pattern = sum(freq_list)/float(no_of_genes)
+		tf_data_list.append([tf, data[0], avg_freq_per_pattern, no_of_genes])
+	
+	lambda_list_cmp = lambda x, y: list_compare(x, y, 1)	#compare the list based on 2nd position(#patterns)
+	tf_data_list.sort(lambda_list_cmp)
+	tf_data_list.reverse()
+	
+	from codense.common import dict_map
+	import csv
+	outf = open(output_fname, 'w')
+	outf.write('TF name\tno_of_patterns\tgene freq\tno_of_genes\n')
+	for row in tf_data_list:
+		tf_list = dict_map(mt_no2tf_name, row[0])
+		outf.write('%s\t%s\t%s\t%s\n'%(','.join(tf_list), row[1], row[2], row[3]))
+	del outf
+	sys.stderr.write("Done.\n")
 	
 
 """
