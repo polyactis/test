@@ -14,6 +14,7 @@ Examples:
 1: Problem2_2
 2: Problem2_3
 3: Problem3_3
+4: Problem3_15
 """
 import sys, os, math
 bit_number = math.log(sys.maxint)/math.log(2)
@@ -87,10 +88,12 @@ class Problem2_3(unittest.TestCase):
 class Problem3_3(unittest.TestCase):
 	"""
 	2006-09-13
+	2006-09-20 change no_of_samples from 10e7 to 1e7
 	"""
-	def test_pro3_3_part_a(self, no_of_samples=10e7):
+	def test_pro3_3_part_a(self, no_of_samples=1e7):
 		print
 		t_value = 2.5
+		print "Get normal probability P(Z>%s) via Monte Carlo sums"%t_value
 		import rpy
 		print 'P(x>%s) from R is %s'%(t_value, rpy.r.pnorm(t_value, lower_tail=rpy.r.FALSE))
 		import random, sys
@@ -100,6 +103,30 @@ class Problem3_3(unittest.TestCase):
 		while i <no_of_samples:
 			random_gauss = random.gauss(0,1)
 			cum_sum += int(random_gauss>t_value)
+			i += 1
+			if i/float(prev_no_of_simulations)==10:
+				prev_no_of_simulations = i
+				print i, cum_sum/i
+
+class Problem3_15(unittest.TestCase):
+	"""
+	2006-09-20
+		importance sampling with exponential distribution
+	"""
+	def test_pro3_15(self, no_of_samples=1e7):
+		print
+		t_value = 2.5
+		print "Importance sampling of normal probability P(Z>%s) via exponential distribution"%t_value
+		import rpy
+		print 'P(x>%s) from R is %s'%(t_value, rpy.r.pnorm(t_value, lower_tail=rpy.r.FALSE))
+		import random, sys, math
+		cum_sum = 0.0
+		i = 0
+		prev_no_of_simulations = 1
+		lmbd =1	#10 is bad, 1 and 0.1 is ok.
+		while i <no_of_samples:
+			random_exp = random.expovariate(lmbd)
+			cum_sum += int(random_exp>t_value)/(lmbd*math.sqrt(2*math.pi))*math.exp(-random_exp*random_exp/2 + lmbd*random_exp)	#simplify the ratio by one exp()
 			i += 1
 			if i/float(prev_no_of_simulations)==10:
 				prev_no_of_simulations = i
@@ -119,7 +146,8 @@ if __name__ == '__main__':
 	
 	TestCaseDict = {1:Problem2_2,
 		2:Problem2_3,
-		3:Problem3_3}
+		3:Problem3_3,
+		4:Problem3_15}
 	type = 0
 	for opt, arg in opts:
 		if opt in ("-h", "--help"):
