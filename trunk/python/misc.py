@@ -4656,15 +4656,18 @@ def get_go_id2gene_set_from_prediction_cut_file(prediction_cut_fname):
 	return go_id2gene_set
 
 
-def tss_cds_distance_histogram(curs, prom_seq_table, tax_id=9606, entrezgene_mapping_table='sequence.entrezgene_mapping', \
+def tss_cds_distance_histogram(curs, tax_id=9606, entrezgene_mapping_table='sequence.entrezgene_mapping', \
 		annot_assembly_table = 'sequence.annot_assembly'):
 	"""
 	2006-09-14
 		check how far between TSS and CDS
+	2006-09-19
+		fix a bug about the strand
+		
 	"""
 	from codense.common import pg_1d_array2python_ls
 	sys.stderr.write("Getting getting tss and cds info from database...\n")
-	curs.execute("DECLARE crs CURSOR FOR SELECT e.gene_id, e.mrna_start, e.cds_start\
+	curs.execute("DECLARE crs CURSOR FOR SELECT e.gene_id,  e.mrna_start, e.mrna_stop, e.cds_start, e.cds_stop, e.strand\
 		from %s e where e.tax_id=%s"%(entrezgene_mapping_table, tax_id))
 	curs.execute("fetch 10000 from crs")
 	rows = curs.fetchall()
@@ -4673,11 +4676,26 @@ def tss_cds_distance_histogram(curs, prom_seq_table, tax_id=9606, entrezgene_map
 	no_of_faraways = 0
 	while rows:
 		for row in rows:
-			gene_id, mrna_start, cds_start = row
-			if mrna_start and cds_start:
+			gene_id, mrna_start, mrna_stop, cds_start, cds_stop, strand = row
+			mrna_loc_ls = []
+			cds_loc_ls = []
+			if mrna_start and mrna_stop and cds_start and cds_stop:
 				mrna_start = pg_1d_array2python_ls(mrna_start, int)
+				mrna_stop = pg_1d_array2python_ls(mrna_stop, int)
+				for i in range(len(mrna_start)):
+					mrna_loc_ls.append([mrna_start[i],mrna_stop[i]])
 				cds_start = pg_1d_array2python_ls(cds_start, int)
-				distance =  abs(mrna_start[0] - cds_start[0])
+				cds_stop = pg_1d_array2python_ls(cds_stop, int)
+				for i in range(len(cds_start)):
+					cds_loc_ls.append([cds_start[i],cds_stop[i]])
+				mrna_loc_ls.sort()
+				cds_loc_ls.sort()
+				if strand=='1':	#plus strand
+					distance =  abs(mrna_loc_ls[0][0] - cds_loc_ls[0][0])
+				elif strand=='-1':	#minus strand
+					distance =  abs(mrna_loc_ls[-1][0] - cds_loc_ls[-1][0])
+				else:	#ignore genes with no strand info, some are not real genes
+					continue
 				if distance<=10000:
 					distance_ls.append(distance)
 				else:
@@ -4707,10 +4725,12 @@ def list_compare(x, y, k):
 		return -1
 
 
-def printTF2pattern2geneInfo(curs, cluster_bs_table, mt_no2tf_name, output_fname):
+def printTF2pattern2geneInfo(curs, cluster_bs_table, mt_no2tf_name, output_fname, no_of_bs_nos=1):
 	"""
 	2006-09-17
 		print out a global picture of TF vs gene pattern information
+	2006-09-19
+		add no_of_bs_nos
 		
 		call list_compare() above
 	"""
@@ -4728,16 +4748,17 @@ def printTF2pattern2geneInfo(curs, cluster_bs_table, mt_no2tf_name, output_fname
 			core_vertex_ls = pg_1d_array2python_ls(core_vertex_ls, int)
 			bs_no_list = pg_1d_array2python_ls(bs_no_list, int)
 			gene_no_list = pg_1d_array2python_ls(gene_no_list, int)
-			bs_no_list.sort()
-			key = tuple(bs_no_list)
-			if key not in tf2data:
-				tf2data[key] = [0, {}]
-			tf2data[key][0] += 1
-			for gene_no in gene_no_list:
-				if gene_no not in tf2data[key][1]:
-					tf2data[key][1][gene_no] = 0
-				tf2data[key][1][gene_no] += 1
-			counter += 1
+			if len(bs_no_list)==no_of_bs_nos:
+				bs_no_list.sort()
+				key = tuple(bs_no_list)
+				if key not in tf2data:
+					tf2data[key] = [0, {}]
+				tf2data[key][0] += 1
+				for gene_no in gene_no_list:
+					if gene_no not in tf2data[key][1]:
+						tf2data[key][1][gene_no] = 0
+					tf2data[key][1][gene_no] += 1
+				counter += 1
 		sys.stderr.write("%s\t%s"%('\x08'*20, counter))
 		curs.execute("fetch 2000 from crs0")
 		rows = curs.fetchall()
