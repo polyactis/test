@@ -4724,13 +4724,48 @@ def list_compare(x, y, k):
 	else: # x<y
 		return -1
 
+def get_mcl_id2occurrent_dataset_ls(curs, pattern_table, occurrence_cutoff=0.8):
+	"""
+	2006-09-21
+		for next function, printTF2pattern2geneInfo()
+	"""
+	from codense.common import pg_1d_array2python_ls
+	sys.stderr.write("Getting mcl_id2occurrent_dataset_ls from %s..."%pattern_table)
+	curs.execute("DECLARE crs1 CURSOR FOR SELECT id, recurrence_array from %s"%\
+		(pattern_table))
+	curs.execute("fetch 2000 from crs1")
+	rows = curs.fetchall()
+	counter = 0
+	mcl_id2occurrent_dataset_ls = {}
+	lambda_cut = lambda x: int(x>=occurrence_cutoff)
+	while rows:
+		for row in rows:
+			id, recurrence_array = row
+			recurrence_array = pg_1d_array2python_ls(recurrence_array, float)
+			recurrence_array = map(lambda_cut, recurrence_array)
+			occurrent_dataset_ls = []
+			for i in range(len(recurrence_array)):
+				if recurrence_array[i] == 1:
+					occurrent_dataset_ls.append(i+1)
+			mcl_id2occurrent_dataset_ls[id] = occurrent_dataset_ls
+			counter += 1
+		sys.stderr.write("%s\t%s"%('\x08'*20, counter))
+		curs.execute("fetch 2000 from crs1")
+		rows = curs.fetchall()
+	curs.execute("close crs1")
+	sys.stderr.write("Done.\n")
+	return mcl_id2occurrent_dataset_ls
 
-def printTF2pattern2geneInfo(curs, cluster_bs_table, mt_no2tf_name, output_fname, no_of_bs_nos=1):
+
+def printTF2pattern2geneInfo(curs, cluster_bs_table, mt_no2tf_name, output_fname, \
+	mcl_id2occurrent_dataset_ls, no_of_bs_nos=1):
 	"""
 	2006-09-17
 		print out a global picture of TF vs gene pattern information
 	2006-09-19
 		add no_of_bs_nos
+	2006-09-21
+		add mcl_id2occurrent_dataset_ls
 		
 		call list_compare() above
 	"""
@@ -4752,12 +4787,16 @@ def printTF2pattern2geneInfo(curs, cluster_bs_table, mt_no2tf_name, output_fname
 				bs_no_list.sort()
 				key = tuple(bs_no_list)
 				if key not in tf2data:
-					tf2data[key] = [0, {}]
+					tf2data[key] = [0, {}, {}]
 				tf2data[key][0] += 1
 				for gene_no in gene_no_list:
 					if gene_no not in tf2data[key][1]:
 						tf2data[key][1][gene_no] = 0
 					tf2data[key][1][gene_no] += 1
+				for dataset_no in mcl_id2occurrent_dataset_ls[mcl_id]:
+					if dataset_no not in tf2data[key][2]:
+						tf2data[key][2][dataset_no] = 0
+					tf2data[key][2][dataset_no] += 1
 				counter += 1
 		sys.stderr.write("%s\t%s"%('\x08'*20, counter))
 		curs.execute("fetch 2000 from crs0")
@@ -4769,11 +4808,16 @@ def printTF2pattern2geneInfo(curs, cluster_bs_table, mt_no2tf_name, output_fname
 	tf_data_list = []
 	for tf, data in tf2data.iteritems():
 		gene_no2freq = data[1]
+		dataset_no2freq = data[2]
 		lambda_divid = lambda x: float(x)/data[0]
 		freq_list = map(lambda_divid, gene_no2freq.values())
 		no_of_genes = len(gene_no2freq)
 		avg_freq_per_pattern = sum(freq_list)/float(no_of_genes)
-		tf_data_list.append([tf, data[0], avg_freq_per_pattern, no_of_genes])
+		
+		dataset_freq_list = map(lambda_divid, dataset_no2freq.values())
+		no_of_datasets = len(dataset_freq_list)
+		avg_dataset_freq_per_pattern = sum(dataset_freq_list)/float(no_of_datasets)
+		tf_data_list.append([tf, data[0], avg_freq_per_pattern, no_of_genes, avg_dataset_freq_per_pattern, no_of_datasets])
 	
 	lambda_list_cmp = lambda x, y: list_compare(x, y, 1)	#compare the list based on 2nd position(#patterns)
 	tf_data_list.sort(lambda_list_cmp)
@@ -4781,14 +4825,27 @@ def printTF2pattern2geneInfo(curs, cluster_bs_table, mt_no2tf_name, output_fname
 	
 	from codense.common import dict_map
 	import csv
-	outf = open(output_fname, 'w')
-	outf.write('TF name\tno_of_patterns\tgene freq\tno_of_genes\n')
+	writer = csv.writer(open(output_fname, 'w'), delimiter='\t')
+	header_row = ['TF name', 'no_of_patterns', 'gene freq', 'no_of_genes', 'dataset freq', 'no_of_datasets']
+	writer.writerow(header_row)
 	for row in tf_data_list:
-		tf_list = dict_map(mt_no2tf_name, row[0])
-		outf.write('%s\t%s\t%s\t%s\n'%(','.join(tf_list), row[1], row[2], row[3]))
-	del outf
+		row[0] = dict_map(mt_no2tf_name, row[0])
+		writer.writerow(row)
+		#outf.write('%s\t%s\t%s\t%s\t%s\t%s\n'%(','.join(tf_list), row[1], row[2], row[3], row[4], row[5]))
+	del writer
 	sys.stderr.write("Done.\n")
 	
+"""
+2006-09-21
+	a wrap-up for functions above
+"""
+def run_printTF2pattern2geneInfo(curs, cluster_bs_table, output_fname, \
+	pattern_table, occurrence_cutoff=0.8, no_of_bs_nos=1, tax_id=9606):
+	from codense.common import get_gene_id2gene_symbol
+	gene_id2gene_symbol = get_gene_id2gene_symbol(curs, tax_id)
+	mcl_id2occurrent_dataset_ls = get_mcl_id2occurrent_dataset_ls(curs, pattern_table, occurrence_cutoff)
+	printTF2pattern2geneInfo(curs, cluster_bs_table, gene_id2gene_symbol, output_fname, \
+		mcl_id2occurrent_dataset_ls, no_of_bs_nos)
 
 """
 #01-03-06 for easy console
