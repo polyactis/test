@@ -4848,6 +4848,206 @@ def run_printTF2pattern2geneInfo(curs, cluster_bs_table, output_fname, \
 		mcl_id2occurrent_dataset_ls, no_of_bs_nos)
 
 """
+2006-10-03
+	different from the get_gene_symbol2gene_id() of common.py, due to the table name
+	BUG in common.py's version
+"""
+def upper_case_gene_symbol2gene_id(curs, tax_id, table='gene.gene'):
+	sys.stderr.write("Getting gene_symbol2gene_id...")
+	gene_symbol2gene_id = {}
+	curs.execute("select gene_id, gene_symbol from %s where tax_id=%s"%(table, tax_id))
+	rows = curs.fetchall()
+	for row in rows:
+		gene_symbol2gene_id[row[1].upper()] = row[0]
+	sys.stderr.write("Done.\n")
+	return gene_symbol2gene_id
+
+
+"""
+2006-10-03
+"""
+def Wei2006_data_to_db(curs, input_fname, target_table='graph.tf_mapping', tf_name='TP53', \
+	tax_id=9606, gene_symbol2gene_id=None, paper_name='Wei2006', \
+	comment='replace multiple spaces with one space and cut the 3rd column'):
+	
+	mt_no = gene_symbol2gene_id.get(tf_name.upper())
+	if not mt_no:
+		print "%s not found in gene_symbol2gene_id"%tf_name
+		return
+	inf = open(input_fname)
+	curs.execute("begin")
+	for line in inf:
+		gene_symbol = line[:-1]
+		gene_id = gene_symbol2gene_id.get(gene_symbol.upper())
+		if gene_id:
+			curs.execute("insert into %s(gene_id, mt_no, tax_id, paper, comment) values('%s', %s, %s, '%s', '%s')"%\
+				(target_table, gene_id, mt_no, tax_id, paper_name, comment))
+	del inf
+	curs.execute("end")
+	
+def Lee2006_data_to_db(curs, input_fname, target_table='graph.tf_mapping', tf_name='SUZ12', \
+	tax_id=9606, gene_symbol2gene_id=None, paper_name='Lee2006', \
+	comment='1st column of table s8'):
+	
+	mt_no = gene_symbol2gene_id.get(tf_name.upper())
+	if not mt_no:
+		print "%s not found in gene_symbol2gene_id"%tf_name
+		return
+	inf = open(input_fname)
+	curs.execute("begin")
+	for line in inf:
+		gene_id = line[:-1]
+		if gene_id:
+			curs.execute("insert into %s(gene_id, mt_no, tax_id, paper, comment) values('%s', %s, %s, '%s', '%s')"%\
+				(target_table, gene_id, mt_no, tax_id, paper_name, comment))
+	del inf
+	curs.execute("end")
+
+def Boyer2005_data_to_db(curs, input_fname, target_table='graph.tf_mapping', tf_name_list=['POU5F1', 'SOX2', 'NANOG', 'E2F4'], \
+	tax_id=9606, gene_symbol2gene_id=None, paper_name='Boyer2005', \
+	comment='read the csv format of the xls'):
+	#POU5F1 is OCT4
+	reader = csv.reader(open(input_fname), delimiter='\t')
+	#skip the first 4 lines
+	for i in range(4):
+		reader.next()
+	
+	curs.execute("begin")
+	for row in reader:
+		gene_symbol, oct4_flag, sox2_flag, nanog_flag, e2f4_flag, expressed_flag = row
+		gene_id = gene_symbol2gene_id.get(gene_symbol.upper())
+		tf_flag_list = [oct4_flag, sox2_flag, nanog_flag, e2f4_flag]
+		if gene_id:
+			for i in range(len(tf_flag_list)):
+				if tf_flag_list[i] != '-':
+					mt_no = gene_symbol2gene_id.get(tf_name_list[i].upper())
+					curs.execute("insert into %s(gene_id, mt_no, tax_id, paper, comment) values('%s', %s, %s, '%s', '%s')"%\
+						(target_table, gene_id, mt_no, tax_id, paper_name, comment))
+	curs.execute("end")
+	del reader
+
+def Odom2006_data_to_db(curs, input_fname, target_table='graph.tf_mapping', \
+	tf_name_list=['FOXA2', 'TCF1', 'HNF4A', 'ONECUT1', 'CREB1',  'USF1'], \
+	tax_id=9606, gene_symbol2gene_id=None, paper_name='Odom2006', \
+	comment='read the csv format of the xls', acc_file='/usr/local/research_data/ncbi/gene/gene2accession'):
+	
+	#FOXA2 is HNF3B, TCF1 is HNF1A, ONECUT1 is HNF6
+	
+	sys.path.insert(0, os.path.join(os.path.expanduser('~/script/microarray/bin')))
+	from sets import Set
+	tax_id_set = Set([tax_id])
+	from MdbId2GeneId import MdbId2GeneId
+	MdbId2GeneId_instance = MdbId2GeneId()
+	acc2gene_id = MdbId2GeneId_instance.setup_acc2gene_id(acc_file, tax_id_set)
+	
+	reader = csv.reader(open(input_fname), delimiter='\t')
+	#skip the first line
+	reader.next()
+	
+	curs.execute("begin")
+	for row in reader:
+		refseq_acc, flag1, flag2, flag3, flag4, flag5, flag6 = row
+		key = (refseq_acc.upper(), tax_id)
+		if key in acc2gene_id:
+			tf_flag_list = [flag1, flag2, flag3, flag4, flag5, flag6]
+			if len(acc2gene_id[key])==1:
+				gene_id = acc2gene_id[key][0]
+				for i in range(len(tf_flag_list)):
+					if tf_flag_list[i] == '1':
+						mt_no = gene_symbol2gene_id.get(tf_name_list[i].upper())
+						curs.execute("insert into %s(gene_id, mt_no, tax_id, paper, comment) values('%s', %s, %s, '%s', '%s')"%\
+							(target_table, gene_id, mt_no, tax_id, paper_name, comment))
+	curs.execute("end")
+	del reader
+
+def Cam2004_data_to_db(curs, input_fname, target_table='graph.tf_mapping', tf_name_list=['E2F4', 'RBL2'], \
+	tax_id=9606, gene_symbol2gene_id=None, paper_name='Cam2004', \
+	comment='read the csv format of the xls, p-value<=0.005', p_value_cut_off=0.005):
+	#RBL2 is p130
+	reader = csv.reader(open(input_fname), delimiter='\t')
+	#skip the first 3 lines
+	for i in range(3):
+		reader.next()
+	
+	curs.execute("begin")
+	for row in reader:
+		gene_symbol = row[0]
+		locuslink = row[1]
+		index_range_e2f4 = [2,6,10]
+		e2f4_p_value_list = []
+		for i in index_range_e2f4:
+			if row[i]:
+				e2f4_p_value_list.append(row[i])
+		e2f4_p_value_list = map(float, e2f4_p_value_list)
+		index_range_p130 = [4,8,12]
+		p130_p_value_list = []
+		for i in index_range_p130:
+			if row[i]:
+				p130_p_value_list.append(row[i])
+		p130_p_value_list = map(float, p130_p_value_list)
+		gene_id = gene_symbol2gene_id.get(gene_symbol.upper())
+		if gene_id:
+			tag_e2f4 = 0
+			for p_value in e2f4_p_value_list:
+				if p_value<=p_value_cut_off:
+					tag_e2f4 = 1
+			tag_p130 = 0
+			for p_value in p130_p_value_list:
+				if p_value<=p_value_cut_off:
+					tag_p130 = 1
+			if tag_e2f4==1:
+				mt_no = gene_symbol2gene_id.get(tf_name_list[0].upper())
+				curs.execute("insert into %s(gene_id, mt_no, tax_id, paper, comment) values('%s', %s, %s, '%s', '%s')"%\
+					(target_table, gene_id, mt_no, tax_id, paper_name, comment))
+			if tag_p130==1:
+				mt_no = gene_symbol2gene_id.get(tf_name_list[1].upper())
+				curs.execute("insert into %s(gene_id, mt_no, tax_id, paper, comment) values('%s', %s, %s, '%s', '%s')"%\
+					(target_table, gene_id, mt_no, tax_id, paper_name, comment))
+	curs.execute("end")
+	del reader
+
+def Cam2004_data_to_db_NRF1(curs, input_fname, target_table='graph.tf_mapping', tf_name='NRF1', \
+	tax_id=9606, gene_symbol2gene_id=None, paper_name='Cam2004', \
+	comment='csv format of xls, NRF1'):
+	
+	mt_no = gene_symbol2gene_id.get(tf_name.upper())
+	if not mt_no:
+		print "%s not found in gene_symbol2gene_id"%tf_name
+		return
+	reader = csv.reader(open(input_fname), delimiter='\t')
+	#skip one line
+	reader.next()
+	curs.execute("begin")
+	for row in reader:
+		gene_symbol = row[0]
+		gene_id = gene_symbol2gene_id.get(gene_symbol.upper())
+		if gene_id:
+			curs.execute("insert into %s(gene_id, mt_no, tax_id, paper, comment) values('%s', %s, %s, '%s', '%s')"%\
+				(target_table, gene_id, mt_no, tax_id, paper_name, comment))
+	curs.execute("end")
+	del reader
+
+
+def Schreiber2006_data_to_db_E2F4(curs, input_fname, target_table='graph.tf_mapping', tf_name='E2F4', \
+	tax_id=9606, gene_symbol2gene_id=None, paper_name='Schreiber2006', \
+	comment='Table 4, E2F4 target, unstimulated U937 cells'):
+	
+	mt_no = gene_symbol2gene_id.get(tf_name.upper())
+	if not mt_no:
+		print "%s not found in gene_symbol2gene_id"%tf_name
+		return
+	inf = open(input_fname)
+	curs.execute("begin")
+	for line in inf:
+		gene_symbol = line[:-1]
+		gene_id = gene_symbol2gene_id.get(gene_symbol.upper())
+		if gene_id:
+			curs.execute("insert into %s(gene_id, mt_no, tax_id, paper, comment) values('%s', %s, %s, '%s', '%s')"%\
+				(target_table, gene_id, mt_no, tax_id, paper_name, comment))
+	del inf
+	curs.execute("end")
+	
+"""
 #01-03-06 for easy console
 import sys, os, math
 bit_number = math.log(sys.maxint)/math.log(2)
