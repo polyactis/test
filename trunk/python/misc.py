@@ -4862,6 +4862,43 @@ def upper_case_gene_symbol2gene_id(curs, tax_id, table='gene.gene'):
 	sys.stderr.write("Done.\n")
 	return gene_symbol2gene_id
 
+"""
+2006-10-08
+	Table gene_symbol2id contains all reverse-mapping information, including aliases, synonyms, etc.
+	Multiple names could lead to same gene_id. 2728 out of 90768 human genes(3%) have this problem.
+	
+	One way to solve this problem is checking the real gene_symbol2gene_id table. 
+"""
+def get_upper_case_gene_name2gene_id(curs, tax_id, table='gene.gene_symbol2id'):
+	sys.stderr.write("Getting upper_case gene_symbol2gene_id...")
+	gene_symbol2gene_id = {}
+	curs.execute("select gene_id, gene_symbol from gene.gene where tax_id=%s"%(tax_id))
+	rows = curs.fetchall()
+	for row in rows:
+		gene_symbol2gene_id[row[1].upper()] = row[0]
+	sys.stderr.write("Done.\n")
+	
+	sys.stderr.write("Getting upper_case gene_symbol2gene_id_list...")
+	gene_symbol2gene_id_list = {}
+	curs.execute("select gene_id, gene_symbol from %s where tax_id=%s"%(table, tax_id))
+	rows = curs.fetchall()
+	for row in rows:
+		gene_id, gene_symbol = row
+		gene_symbol = gene_symbol.upper()
+		if gene_symbol not in gene_symbol2gene_id_list:
+			gene_symbol2gene_id_list[gene_symbol] = []
+		gene_symbol2gene_id_list[gene_symbol].append(gene_id)
+	sys.stderr.write("Done.\n")
+	
+	sys.stderr.write("Making gene_name2gene_id...")
+	gene_name2gene_id = {}
+	for gene_symbol, gene_id_list in gene_symbol2gene_id_list.iteritems():
+		if len(gene_id_list)==1:
+			gene_name2gene_id[gene_symbol] = gene_id_list[0]
+		elif gene_symbol in gene_symbol2gene_id:	#take the orthodox one
+			gene_name2gene_id[gene_symbol] = gene_symbol2gene_id[gene_symbol]
+	sys.stderr.write("Done.\n")
+	return gene_name2gene_id
 
 """
 2006-10-03
@@ -4907,6 +4944,7 @@ def Boyer2005_data_to_db(curs, input_fname, target_table='graph.tf_mapping', tf_
 	tax_id=9606, gene_symbol2gene_id=None, paper_name='Boyer2005', \
 	comment='read the csv format of the xls'):
 	#POU5F1 is OCT4
+	import csv
 	reader = csv.reader(open(input_fname), delimiter='\t')
 	#skip the first 4 lines
 	for i in range(4):
