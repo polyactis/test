@@ -5046,7 +5046,77 @@ def Schreiber2006_data_to_db_E2F4(curs, input_fname, target_table='graph.tf_mapp
 				(target_table, gene_id, mt_no, tax_id, paper_name, comment))
 	del inf
 	curs.execute("end")
+
+
+"""
+2006-10-03
 	
+"""
+
+def get_mt_no2gene_id_set(curs, tf_mapping_table, gene_id_set):
+	from sets import Set
+	sys.stderr.write("Getting mt_no2gene_id_set from %s"%tf_mapping_table)
+	curs.execute("select gene_id, mt_no from %s"%tf_mapping_table)
+	rows = curs.fetchall()
+	mt_no2gene_id_set = {}
+	for row in rows:
+		gene_id, mt_no = row
+		if gene_id in gene_id_set:
+			if mt_no not in mt_no2gene_id_set:
+				mt_no2gene_id_set[mt_no] = Set()
+			mt_no2gene_id_set[mt_no].add(gene_id)
+	sys.stderr.write("Done.\n")
+	return mt_no2gene_id_set
+
+def draw_pie_chart(figure_no, fracs, output_fname, mt_symbol, labels= ['comp', 'both', 'expt'], explode=(0, 0.05, 0)):
+	import pylab
+	import matplotlib
+	matplotlib.use("Agg")
+	# make a square figure and axes
+	pylab.figure(figure_no, figsize=(8,8))
+	#ax = axes([0.1, 0.1, 0.8, 0.8])
+	#labels = 'Frogs', 'Hogs', 'Dogs', 'Logs'
+	#fracs = [15,30,45, 10]
+	#explode=(0, 0.05, 0, 0)
+	pylab.pie(fracs, explode=explode, labels=labels, autopct='%1.1f%%', shadow=True)
+	pylab.title('overlapping of  %s targets'%mt_symbol, bbox={'facecolor':0.8, 'pad':5})
+	pylab.savefig(output_fname)
+	#show()
+
+def draw_pie_charts_of_overlapping_tf_targets(curs, gene_table, output_dir, gene_id2gene_symbol,\
+	comp_tf_mapping_table='graph.gene_id2mt_no', expt_tf_mapping_table='graph.tf_mapping'):
+	sys.stderr.write("Getting gene_id set from %s"%gene_table)
+	curs.execute("select gene_id from %s"%gene_table)
+	from sets import Set
+	gene_id_set = Set()
+	rows = curs.fetchall()
+	for row in rows:
+		gene_id_set.add(row[0])
+	sys.stderr.write("Done.\n")
+	
+	comp_mt_no2gene_id_set = get_mt_no2gene_id_set(curs, comp_tf_mapping_table, gene_id_set)
+	expt_mt_no2gene_id_set = get_mt_no2gene_id_set(curs, expt_tf_mapping_table, gene_id_set)
+	
+	comp_mt_no_set = Set(comp_mt_no2gene_id_set.keys())
+	expt_mt_no_set = Set(expt_mt_no2gene_id_set.keys())
+	overlapping_mt_no_set = comp_mt_no_set&expt_mt_no_set
+	sys.stderr.write("Drawing...\n")
+	figure_no = 2
+	for mt_no in overlapping_mt_no_set:
+		mt_symbol = gene_id2gene_symbol.get(mt_no)
+		if mt_symbol:
+			print mt_symbol
+			comp_only_set = comp_mt_no2gene_id_set[mt_no] - expt_mt_no2gene_id_set[mt_no]
+			expt_only_set = expt_mt_no2gene_id_set[mt_no] - comp_mt_no2gene_id_set[mt_no]
+			common_set = comp_mt_no2gene_id_set[mt_no] & expt_mt_no2gene_id_set[mt_no]
+			total_length = len(comp_only_set) + len(expt_only_set) + len(common_set)
+			total_length = float(total_length)
+			fracs = [len(comp_only_set)/total_length, len(expt_only_set)/total_length, len(common_set)/total_length]
+			output_fname = os.path.join(output_dir, '%s_pie.png'%mt_symbol)
+			draw_pie_chart(figure_no, fracs, output_fname, '%s, %s genes'%(mt_symbol, int(total_length)) )
+			figure_no += 1
+	sys.stderr.write("Done.\n")
+
 """
 #01-03-06 for easy console
 import sys, os, math
