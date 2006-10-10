@@ -5085,10 +5085,81 @@ def Schreiber2006_data_to_db_E2F4(curs, input_fname, target_table='graph.tf_mapp
 	del inf
 	curs.execute("end")
 
+"""
+2006-10-09
+"""
+def Palomero2006_data_to_db(curs, input_fname, target_table='graph.tf_mapping', tf_name_list=['TAL1', 'TCF3', 'TCF12'], \
+	tax_id=9606, gene_symbol2gene_id=None, paper_name='Palomero2006', \
+	comment='TableS2, hand-copy from the pdf format'):
+	#TCF3 is E2A, TCF12 is HEB
+	import csv
+	reader = csv.reader(open(input_fname), delimiter='\t')
+	#skip the first line
+	reader.next()
+	
+	curs.execute("begin")
+	for row in reader:
+		gene_symbol, flag1, flag2, flag3 = row
+		if gene_symbol:	#skip the blank lines
+			gene_id = gene_symbol2gene_id.get(gene_symbol.upper())
+			tf_flag_list = [flag1, flag2, flag3]
+			if gene_id:
+				for i in range(len(tf_flag_list)):
+					if tf_flag_list[i] == '1':
+						mt_no = gene_symbol2gene_id.get(tf_name_list[i].upper())
+						curs.execute("insert into %s(gene_id, mt_no, tax_id, paper, comment) values('%s', %s, %s, '%s', '%s')"%\
+							(target_table, gene_id, mt_no, tax_id, paper_name, comment))
+	curs.execute("end")
+	del reader
+
+def Schreiber2006_binding_data_to_db(curs, input_fname, target_table='graph.tf_mapping', \
+	tf_name_list=['RELA', 'REL', 'RELB', 'NFKB1', 'FKBP4'], \
+	tax_id=9606, gene_symbol2gene_id=None, paper_name='Schreiber2006', \
+	comment='', p_value_threshold=0.01):
+	#RELA is p65, NFKB1 is p50, REL is c-Rel, FKBP4 is p52
+	import csv
+	reader = csv.reader(open(input_fname), delimiter='\t')
+	#skip the first 2 lines
+	reader.next()
+	reader.next()
+	
+	curs.execute("begin")
+	for row in reader:
+		gene_symbol = row[0]
+		no_LPS_p_value_list = row[1:6]
+		with_LPS_p_value_list = row[7:12]
+		rpolII_binding_ratio_list = row[14:16]
+		if gene_symbol:	#skip the blank lines
+			gene_id = gene_symbol2gene_id.get(gene_symbol.upper())
+			if gene_id:
+				for i in range(len(no_LPS_p_value_list)):	#without LPS
+					if no_LPS_p_value_list[i] and no_LPS_p_value_list[i]!=' ':
+						p_value = float(no_LPS_p_value_list[i])
+						if p_value<=p_value_threshold:
+							mt_no = gene_symbol2gene_id.get(tf_name_list[i].upper())
+							if rpolII_binding_ratio_list[0]:	#if the ratio under no LPS is available
+								comment = 'pvalue=%s, LPS=0, RPolII_ratio=%s'%(p_value, rpolII_binding_ratio_list[0])
+							else:
+								comment = 'pvalue=%s, LPS=0, RPolII_ratio=NA'%(p_value)
+							curs.execute("insert into %s(gene_id, mt_no, tax_id, paper, comment) values('%s', %s, %s, '%s', '%s')"%\
+								(target_table, gene_id, mt_no, tax_id, paper_name, comment))
+				for i in range(len(with_LPS_p_value_list)):	#with LPS
+					if with_LPS_p_value_list[i] and with_LPS_p_value_list[i]!=' ':
+						p_value = float(with_LPS_p_value_list[i])
+						if p_value<=p_value_threshold:
+							mt_no = gene_symbol2gene_id.get(tf_name_list[i].upper())
+							if rpolII_binding_ratio_list[1]:	#if the ratio under LPS is available
+								comment = 'pvalue=%s, LPS=1, RPolII_ratio=%s'%(p_value, rpolII_binding_ratio_list[1])
+							else:
+								comment = 'pvalue=%s, LPS=1, RPolII_ratio=NA'%(p_value)
+							curs.execute("insert into %s(gene_id, mt_no, tax_id, paper, comment) values('%s', %s, %s, '%s', '%s')"%\
+								(target_table, gene_id, mt_no, tax_id, paper_name, comment))
+	curs.execute("end")
+	del reader
 
 """
 2006-10-03
-	
+	see how much overlapping between computational and experiments' hits
 """
 
 def get_mt_no2gene_id_set(curs, tf_mapping_table, gene_id_set):
@@ -5107,9 +5178,9 @@ def get_mt_no2gene_id_set(curs, tf_mapping_table, gene_id_set):
 	return mt_no2gene_id_set
 
 def draw_pie_chart(figure_no, fracs, output_fname, mt_symbol, labels= ['comp', 'both', 'expt'], explode=(0, 0.05, 0)):
-	import pylab
 	import matplotlib
 	matplotlib.use("Agg")
+	import pylab
 	# make a square figure and axes
 	pylab.figure(figure_no, figsize=(8,8))
 	#ax = axes([0.1, 0.1, 0.8, 0.8])
@@ -5123,6 +5194,7 @@ def draw_pie_chart(figure_no, fracs, output_fname, mt_symbol, labels= ['comp', '
 
 def draw_pie_charts_of_overlapping_tf_targets(curs, gene_table, output_dir, gene_id2gene_symbol,\
 	comp_tf_mapping_table='graph.gene_id2mt_no', expt_tf_mapping_table='graph.tf_mapping'):
+	import os,sys
 	sys.stderr.write("Getting gene_id set from %s"%gene_table)
 	curs.execute("select gene_id from %s"%gene_table)
 	from sets import Set
@@ -5139,6 +5211,8 @@ def draw_pie_charts_of_overlapping_tf_targets(curs, gene_table, output_dir, gene
 	expt_mt_no_set = Set(expt_mt_no2gene_id_set.keys())
 	overlapping_mt_no_set = comp_mt_no_set&expt_mt_no_set
 	sys.stderr.write("Drawing...\n")
+	if not os.path.isdir(output_dir):
+		os.makedirs(output_dir)
 	figure_no = 2
 	for mt_no in overlapping_mt_no_set:
 		mt_symbol = gene_id2gene_symbol.get(mt_no)
