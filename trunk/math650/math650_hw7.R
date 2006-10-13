@@ -32,7 +32,6 @@ summary(update(hills1.lm, weights=1/dist^2))
 #chap_11_no_10
 library(lattice)
 data1 = read.csv("/usr/local/doc/statistical_sleuth/ASCII/ex0328.csv")
-data1 = read.csv("/tmp/ex0328.csv")
 LOGIT = data1$REMOVED/(1-data1$REMOVED)
 LOGDURATION = log(data1$DURATION)
 data2 = cbind(data1, LOGIT, LOGDURATION)
