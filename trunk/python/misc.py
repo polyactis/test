@@ -5229,6 +5229,126 @@ def draw_pie_charts_of_overlapping_tf_targets(curs, gene_table, output_dir, gene
 			figure_no += 1
 	sys.stderr.write("Done.\n")
 
+	
+"""
+2006-10-22
+	draw some histograms of haifeng's prediction output(p-value, m1_score)
+"""
+def inspect_prediction_data_m1_score_and_p_value(input_fname):
+	import csv, numarray, math
+	import matplotlib; matplotlib.use("Agg")
+	import pylab
+	reader = csv.reader(open(input_fname), delimiter='\t')
+	p_value_correct_list = []
+	m1_score_correct_list = []
+	p_value_not_correct_list = []
+	m1_score_not_correct_list = []
+	counter = 0
+	for row in reader:
+		pattern_id, unknown_percentage, no_of_vertices, no_of_edges, avg_degree, density, supports, vertex_id, \
+			is_known, unknown_neighbor_perc, degree, no_of_neighbors = row[:12]
+		no_of_gos = len(row[12:])/3
+		go_binary_list = row[12:12+no_of_gos*1]
+		m1_list = row[12+no_of_gos*1:12+no_of_gos*2]
+		p_value_list =row[12+no_of_gos*2:12+no_of_gos*3]
+		
+		m1_list = map(float, m1_list)
+		p_value_list = map(float, p_value_list)
+		go_index_with_max_m1_score = numarray.argmax(m1_list)
+		p_value = p_value_list[go_index_with_max_m1_score]
+		if p_value==0:
+			log_p_value = 50
+		else:
+			log_p_value = -math.log(p_value)
+		if go_binary_list[go_index_with_max_m1_score]=='1':
+			p_value_correct_list.append(log_p_value)
+			m1_score_correct_list.append(m1_list[go_index_with_max_m1_score])
+		else:
+			p_value_not_correct_list.append(log_p_value)
+			m1_score_not_correct_list.append(m1_list[go_index_with_max_m1_score])
+		counter+=1
+		if counter%2000==0:
+			sys.stderr.write("%s%s"%('\x08'*20, counter))
+	sys.stderr.write("%s%s\n"%('\x08'*20, counter))
+	del reader
+	pylab.figure()
+	pylab.hist(m1_score_not_correct_list, 100, normed=1, alpha=0.5)
+	pylab.hist(m1_score_correct_list, 100, normed=1, alpha=0.5, facecolor='r', edgecolor='r')
+	pylab.savefig('m1_score_hist.png')
+	pylab.clf()
+	pylab.hist(p_value_not_correct_list, 100, normed=1, alpha=0.5)
+	pylab.hist(p_value_correct_list, 100, normed=1, alpha=0.5, facecolor='r', edgecolor='r')
+	pylab.savefig('p_value_hist.png')
+
+
+def inspect_recurrence_size_scatter(curs, pattern_table):
+	import pylab
+	curs.execute("DECLARE crs CURSOR for select no_of_vertices, connectivity, recurrence_array from %s"%pattern_table)
+	curs.execute("fetch 5000 from crs")
+	rows = curs.fetchall()
+	recurrence_ls = []
+	size_ls = []
+	counter = 0
+	while rows:
+		for row in rows:
+			no_of_vertices, connectivity, recurrence_array = row
+			recurrence_array = recurrence_array[1:-1].split(',')
+			recurrence_array = map((lambda x: int(float(x)>=0.8)), recurrence_array)
+			recurrence = sum(recurrence_array)
+			recurrence_ls.append(recurrence)
+			size_ls.append(connectivity)
+			counter += 1
+		sys.stderr.write("%s%s"%('\x08'*20, counter))
+		curs.execute("fetch 5000 from crs")
+		rows = curs.fetchall()
+	curs.execute("close crs")
+	pylab.scatter(size_ls, recurrence_ls, alpha=0.5)
+	pylab.show()
+	
+"""
+2006-10-22
+	input_fname is output of MpiMarkov.py
+"""
+def tryRandomForest(input_fname):
+	import csv, numarray, math
+	reader = csv.reader(open(input_fname), delimiter='\t')
+	counter = 0
+	real_counter = 0
+	known_data = []
+	for row in reader:
+		pattern_id, unknown_percentage, no_of_vertices, no_of_edges, avg_degree, density, supports, vertex_id, \
+			is_known, unknown_neighbor_perc, degree, no_of_neighbors = row[:12]
+		no_of_gos = len(row[12:])/3
+		go_binary_list = row[12:12+no_of_gos*1]
+		m1_list = row[12+no_of_gos*1:12+no_of_gos*2]
+		p_value_list =row[12+no_of_gos*2:12+no_of_gos*3]
+		if is_known=='1':
+			m1_list = map(float, m1_list)
+			p_value_list = map(float, p_value_list)
+			go_index_with_max_m1_score = numarray.argmax(m1_list)
+			p_value = p_value_list[go_index_with_max_m1_score]
+			if p_value<1:	#filter out some entries
+				#log_p_value = -math.log(p_value)
+				is_correct = int(go_binary_list[go_index_with_max_m1_score])
+				data_row = [p_value, float(supports), float(density),\
+					int(no_of_vertices), m1_list[go_index_with_max_m1_score], is_correct]
+				known_data.append(data_row)
+				real_counter += 1
+		counter += 1
+		if counter%5000==0:
+			sys.stderr.write("%s%s\t%s"%('\x08'*20, counter, real_counter))
+	sys.stderr.write("%s%s\t%s\n"%('\x08'*20, counter, real_counter))
+	del reader
+	known_data = numarray.array(known_data)
+	from rpart_prediction import rpart_prediction
+	rpart_prediction_instance = rpart_prediction(debug=1)
+	fit_model = rpart_prediction_instance.randomForest_fit(known_data, [0], rpart_prediction_instance.bit_string)
+	known_pred = rpart_prediction_instance.randomForest_predict(fit_model, known_data)
+	fit_model_py = fit_model.as_py(BASIC_CONVERSION)
+	print rpart_prediction_instance.cal_accuracy(known_data,  fit_model_py['predicted'], pred_type=1)
+	print self.cal_accuracy(known_data, known_pred, pred_type=2)
+	
+
 """
 #01-03-06 for easy console
 import sys, os, math
