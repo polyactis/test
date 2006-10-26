@@ -5350,6 +5350,111 @@ def tryRandomForest(input_fname):
 	
 
 """
+2006-10-23
+	convert MpiMarkov.py's output to R data frame input in order to draw scatter matrix
+"""
+def convert_prediction_data_to_R(input_fname, output_fname):
+	import csv, numarray, math
+	reader = csv.reader(open(input_fname), delimiter='\t')
+	writer = csv.writer(open(output_fname, 'w'), delimiter='\t')
+	counter = 0
+	header_row = ['recurrence', 'size', 'density', 'm1_score', 'p_value']
+	writer.writerow(header_row)
+	for row in reader:
+		pattern_id, unknown_percentage, no_of_vertices, no_of_edges, avg_degree, density, supports, vertex_id, \
+			is_known, unknown_neighbor_perc, degree, no_of_neighbors = row[:12]
+		no_of_gos = len(row[12:])/3
+		go_binary_list = row[12:12+no_of_gos*1]
+		m1_list = row[12+no_of_gos*1:12+no_of_gos*2]
+		p_value_list =row[12+no_of_gos*2:12+no_of_gos*3]
+		m1_list = map(float, m1_list)
+		p_value_list = map(float, p_value_list)
+		go_index_with_max_m1_score = numarray.argmax(m1_list)
+		p_value = p_value_list[go_index_with_max_m1_score]
+		is_correct = int(go_binary_list[go_index_with_max_m1_score])
+		row = [int(supports), int(no_of_vertices), float(density), m1_list[go_index_with_max_m1_score], p_value]
+		writer.writerow(row)
+		counter += 1
+		if counter%5000==0:
+			sys.stderr.write("%s%s"%('\x08'*20, counter))
+	sys.stderr.write("%s%s\n"%('\x08'*20, counter))
+	del reader, writer
+
+"""
+2006-10-23
+"""
+def extract_go_with_max_score_from_prediction_data(input_fname, output_fname):
+	import csv, numarray, math
+	reader = csv.reader(open(input_fname), delimiter='\t')
+	writer = csv.writer(open(output_fname, 'w'), delimiter='\t')
+	counter = 0
+	header_row = ['gene_no', 'pattern_id', 'go_index', 'is_correct', 'recurrence', 'size', 'density', 'm1_score', 'p_value']
+	writer.writerow(header_row)
+	for row in reader:
+		pattern_id, unknown_percentage, no_of_vertices, no_of_edges, avg_degree, density, supports, vertex_id, \
+			is_known, unknown_neighbor_perc, degree, no_of_neighbors = row[:12]
+		no_of_gos = len(row[12:])/3
+		go_binary_list = row[12:12+no_of_gos*1]
+		m1_list = row[12+no_of_gos*1:12+no_of_gos*2]
+		p_value_list =row[12+no_of_gos*2:12+no_of_gos*3]
+		m1_list = map(float, m1_list)
+		p_value_list = map(float, p_value_list)
+		go_index_with_max_m1_score = numarray.argmax(m1_list)
+		p_value = p_value_list[go_index_with_max_m1_score]
+		is_correct = int(go_binary_list[go_index_with_max_m1_score])
+		row = [vertex_id, pattern_id, go_index_with_max_m1_score, go_binary_list[go_index_with_max_m1_score], \
+			int(supports), int(no_of_vertices), float(density), m1_list[go_index_with_max_m1_score], p_value]
+		writer.writerow(row)
+		counter += 1
+		if counter%5000==0:
+			sys.stderr.write("%s%s"%('\x08'*20, counter))
+	sys.stderr.write("%s%s\n"%('\x08'*20, counter))
+	del reader, writer
+
+"""
+2006-10-23
+"""
+def inspect_all_patterns_edge_freq(curs, pattern_table, edge_freq_hist_output_fname):
+	import matplotlib; matplotlib.use("Agg")
+	import pylab, networkx
+	curs.execute("DECLARE crs CURSOR for select edge_set from %s"%pattern_table)
+	curs.execute("fetch 5000 from crs")
+	rows = curs.fetchall()
+	g = networkx.XGraph()
+	counter = 0
+	while rows:
+		for row in rows:
+			edge_set = row[0]
+			edge_set = edge_set[2:-2].split('},{')
+			for edge in edge_set:
+				edge = edge.split(',')
+				edge = map(int, edge)
+				if g.has_edge(edge):
+					freq = g.get_edge(edge[0], edge[1]) + 1
+					g.add_edge(edge[0], edge[1], freq)
+				else:
+					g.add_edge(edge[0], edge[1], 1)
+			counter += 1
+		sys.stderr.write("%s%s"%('\x08'*20, counter))
+		curs.execute("fetch 5000 from crs")
+		rows = curs.fetchall()
+	curs.execute("close crs")
+	print
+	edge_frequency_ls = []
+	for e in g.edges_iter():
+		edge_frequency_ls.append(e[2])
+	pylab.figure()
+	pylab.xlabel("edge frequency (from %s patterns)"%counter)
+	pylab.title("histogram of edge freq from %s"%pattern_table)
+	pylab.hist(edge_frequency_ls, 500, alpha=0.5)
+	pylab.savefig(edge_freq_hist_output_fname)
+	pylab.clf()
+	print "%s nodes"%g.number_of_nodes()
+	print "%s edges"%g.number_of_edges()
+	return g
+
+
+"""
 #01-03-06 for easy console
 import sys, os, math
 bit_number = math.log(sys.maxint)/math.log(2)
