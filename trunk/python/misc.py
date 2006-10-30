@@ -5453,8 +5453,177 @@ def inspect_all_patterns_edge_freq(curs, pattern_table, edge_freq_hist_output_fn
 	print "%s edges"%g.number_of_edges()
 	return g
 
+"""
+2006-10-26
+	draw some histograms of p_gene table(p-value, m1_score)
+"""
+def inspect_p_gene_table_m1_score_and_p_value(curs, p_gene_table, m1_score_histogram_fname, p_value_histogram_fname):
+	import csv, numarray, math
+	import matplotlib; matplotlib.use("Agg")
+	import pylab
+	curs.execute("DECLARE crs1 CURSOR FOR SELECT is_correct, avg_p_value, edge_gradient from %s"%p_gene_table)
+	curs.execute("fetch 5000 from crs1")
+	rows = curs.fetchall()
+	p_value_list = [[],[]]	#index 0 is wrong, 1 is correct
+	m1_score_list = [[], []]
+	counter = 0
+	while rows:
+		for row in rows:
+			is_correct, p_value, m1_score = row
+			if p_value==0:
+				log_p_value = 50
+			else:
+				log_p_value = -math.log(p_value)
+			p_value_list[is_correct].append(log_p_value)
+			m1_score_list[is_correct].append(m1_score)
+			counter+=1
+		curs.execute("fetch 5000 from crs1")
+		rows = curs.fetchall()
+		sys.stderr.write("%s%s"%('\x08'*20, counter))
+	sys.stderr.write("%s%s\n"%('\x08'*20, counter))
+	curs.execute("close crs1")
+	pylab.figure()
+	pylab.hist(m1_score_list[0], 100, normed=1, alpha=0.5)
+	pylab.hist(m1_score_list[1], 100, normed=1, alpha=0.5, facecolor='r', edgecolor='r')
+	pylab.savefig(m1_score_histogram_fname)
+	pylab.clf()
+	pylab.hist(p_value_list[0], 100, normed=1, alpha=0.5)
+	pylab.hist(p_value_list[1], 100, normed=1, alpha=0.5, facecolor='r', edgecolor='r')
+	pylab.savefig(p_value_histogram_fname)
 
 """
+2006-10-26
+	convert p_gene_table to R data frame input in order to draw scatter matrix
+"""
+def convert_p_gene_table_to_R(curs, p_gene_table, output_fname):
+	import csv, numarray, math
+	outf = open(output_fname, 'w')
+	counter = 0
+	row = ['recurrence', 'size', 'density', 'm1_score', 'p_value']
+	outf.write("%s\t%s\t%s\t%s\t%s\n"%(row[0], row[1], row[2], row[3], row[4]))
+	#writer.writerow(header_row)
+	curs.execute("DECLARE crs1 CURSOR FOR SELECT recurrence_cut_off, cluster_size_cut_off, connectivity_cut_off, edge_gradient,\
+		avg_p_value from %s"%p_gene_table)
+	curs.execute("fetch 5000 from crs1")
+	rows = curs.fetchall()
+	while rows:
+		for row in rows:
+			outf.write("%s\t%s\t%s\t%s\t%s\n"%(row[0], row[1], row[2], row[3], row[4]))
+			#writer.writerow(row)
+			counter += 1
+		curs.execute("fetch 5000 from crs1")
+		rows = curs.fetchall()
+		sys.stderr.write("%s%s"%('\x08'*20, counter))
+	sys.stderr.write("%s%s\n"%('\x08'*20, counter))
+	curs.execute("close crs1")
+	#del writer
+	del outf
+
+"""
+2006-10-27
+"""
+def draw_two_color_scatter_plot(x_data, y_data, x_label, y_label, output_fname):
+	sys.stderr.write("Drawing scatter plot %s vs %s ..."%(x_label, y_label))
+	"""
+	x_max = max(max(x_data[0]), max(x_data[1]))
+	x_min = min(min(x_data[0]), min(x_data[1]))
+	x_extra = (x_max - x_min)*0.1
+	y_max = max(max(y_data[0]), max(y_data[1]))
+	y_min = min(min(y_data[0]), min(y_data[1]))
+	y_extra = (y_max-y_min)*0.1
+	"""
+	import matplotlib; matplotlib.use("Agg")
+	import pylab
+	pylab.figure()
+	pylab.xlabel(x_label)
+	pylab.ylabel(y_label)
+	"""
+	pylab.xlim(x_min-x_extra, x_max+x_extra)
+	pylab.ylim(y_min-y_extra, y_max+y_extra)
+	"""
+	pylab.scatter(x_data[1], y_data[1], 10, alpha=0, edgecolor='w', facecolor='w')	#just leave a ghost
+	pylab.scatter(x_data[0], y_data[0], 10, alpha=0.3, edgecolor='w')
+	pylab.savefig(output_fname)
+	pylab.clf()
+	
+	pylab.figure()
+	pylab.xlabel(x_label)
+	pylab.ylabel(y_label)
+	"""
+	pylab.xlim(x_min-x_extra, x_max+x_extra)
+	pylab.ylim(y_min-y_extra, y_max+y_extra)
+	"""
+	pylab.scatter(x_data[0], y_data[0], 10, alpha=0, edgecolor='w')	#just leave a ghost
+	pylab.scatter(x_data[1], y_data[1], 10, c='r', alpha=0.3, edgecolor='w')
+	new_output_fname = '%s2'%output_fname
+	pylab.savefig(new_output_fname)
+	pylab.clf()
+	
+	sys.stderr.write("done.\n")
+
+def draw_two_color_histogram(data, label, output_fname):
+	sys.stderr.write("Drawing histogram %s ..."%label)
+	import matplotlib; matplotlib.use("Agg")
+	import pylab
+	pylab.figure()
+	pylab.xlabel(label)
+	pylab.hist(data[0], 100, normed=1, alpha=0.5)
+	pylab.hist(data[1], 100, normed=1, alpha=0.5, facecolor='r', edgecolor='r')
+	pylab.savefig(output_fname)
+	pylab.clf()
+	sys.stderr.write("done.\n")
+
+def inspect_prediction_data_by_pylab(input_fname, output_dir):
+	import csv, numarray, math
+	reader = csv.reader(open(input_fname), delimiter='\t')
+	counter = 0
+	pattern_id2properties = {}
+	for row in reader:
+		pattern_id, unknown_percentage, no_of_vertices, no_of_edges, avg_degree, density, supports, vertex_id, \
+			is_known, unknown_neighbor_perc, degree, no_of_neighbors = row[:12]
+		no_of_gos = len(row[12:])/3
+		go_binary_list = row[12:12+no_of_gos*1]
+		m1_list = row[12+no_of_gos*1:12+no_of_gos*2]
+		p_value_list =row[12+no_of_gos*2:12+no_of_gos*3]
+		m1_list = map(float, m1_list)
+		p_value_list = map(float, p_value_list)
+		go_index_with_max_m1_score = numarray.argmax(m1_list)
+		p_value = p_value_list[go_index_with_max_m1_score]
+		is_correct = int(go_binary_list[go_index_with_max_m1_score])
+		if pattern_id not in pattern_id2properties:
+			pattern_id2properties[pattern_id] = [0.0, 0.0, int(supports), int(no_of_vertices), float(density), float(avg_degree), \
+				float(unknown_percentage)]	#the first two 0,0 are for #wrong, #correct respectively
+		pattern_id2properties[pattern_id][is_correct]+=1
+		
+		counter += 1
+		if counter%5000==0:
+			sys.stderr.write("%s%s"%('\x08'*20, counter))
+	sys.stderr.write("%s%s\n"%('\x08'*20, counter))
+	del reader
+	#import pdb
+	prediction_data = [[[], []], [[], []], [[], []], [[], []], [[], []]]	#[[[],[]]]*5 doens't work. It'll link all five lists.
+	for pattern_id, properties in pattern_id2properties.iteritems():
+		#pdb.set_trace()
+		correct_ratio = float(properties[1])/(properties[0]+properties[1])
+		if correct_ratio ==1:
+			logit = 100
+		else:
+			logit = correct_ratio/(1-correct_ratio)
+		which_category = int(logit>1)
+		for i in range(5):
+			prediction_data[i][which_category].append(properties[i+2])
+	if not os.path.isdir(output_dir):
+		os.makedirs(output_dir)
+	property_label_list = ['recurrence', 'size', 'density', 'avg_degree', 'unknown_ratio']
+	for i in range(5):
+		histogram_fname = os.path.join(output_dir, 'histogram_%s'%(property_label_list[i]))
+		draw_two_color_histogram(prediction_data[i], property_label_list[i], histogram_fname)
+		for j in range(i+1, 5):
+			scatter_plot_fname = os.path.join(output_dir, 'scatterplot_%s_%s'%(property_label_list[i], property_label_list[j]))
+			draw_two_color_scatter_plot(prediction_data[i], prediction_data[j], property_label_list[i], property_label_list[j], scatter_plot_fname)
+			
+
+	
 #01-03-06 for easy console
 import sys, os, math
 bit_number = math.log(sys.maxint)/math.log(2)
@@ -5465,11 +5634,11 @@ else:   #32bit
 	sys.path.insert(0, os.path.expanduser('~/lib/python'))
 	sys.path.insert(0, os.path.join(os.path.expanduser('~/script/annot/bin')))
 
+sys.path.insert(0, os.path.join(os.path.expanduser('~/script/test/python')))
 from codense.common import db_connect, form_schema_tables
 hostname='zhoudb'
 dbname='graphdb'
 conn, curs = db_connect(hostname, dbname)
-"""
 
 if __name__ == '__main__':
 	
