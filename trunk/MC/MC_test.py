@@ -15,6 +15,7 @@ Examples:
 2: Problem2_3
 3: Problem3_3
 4: Problem3_15
+5: Problem5_1
 """
 import sys, os, math
 bit_number = math.log(sys.maxint)/math.log(2)
@@ -132,6 +133,53 @@ class Problem3_15(unittest.TestCase):
 				prev_no_of_simulations = i
 				print i, cum_sum/i
 
+class Problem5_1 (unittest.TestCase):
+	"""
+	2006-10-31
+		basic
+		simulated anealing
+		
+		R code to get the maximum:
+		f = function(x) { (cos(50*x)+sin(20*x))^2}
+		optimize( f, l=0, u = 1, maximum=TRUE)
+			or
+		optim(0, f, l=0, u=1, control=list(fnscale=-100)
+		
+		The answer is x=0.379125, max(f)= 3.832543
+	"""
+	def test_basic(self, no_of_samples=1e6):
+		import random, math
+		f = -10	#initial value
+		i = 0
+		x_where_maxi_f = 0
+		while i< no_of_samples:
+			x = random.random()
+			new_f = math.pow((math.cos(50*x)+math.sin(20*x)), 2)
+			if new_f>f:
+				f = new_f
+				x_where_maxi_f = x
+			i+=1
+		print "x=%s, max(f)=%s"%(x_where_maxi_f, f)
+	
+	def f_function(self, x):
+		return math.pow((math.cos(50*x)+math.sin(20*x)), 2)
+	
+	def test_simulated_annealing(self, neighbor_range = 0.25, no_of_samples=1e6):
+		import random, math
+		t = 2
+		x_where_maxi_f = 0.5	#initial x
+		while t< no_of_samples:
+			u = random.uniform(max(x_where_maxi_f - neighbor_range, 0), min(x_where_maxi_f + neighbor_range, 1))
+			t_i = 0.01/math.log(t)
+			prob = min(math.exp( ( self.f_function(u) - self.f_function(x_where_maxi_f) )/t_i ), 1)
+			random_prob = random.random()
+			if random_prob<=prob:
+				x_where_maxi_f = u
+			t += 1
+		max_f = self.f_function(x_where_maxi_f)
+		print "x=%s, max(f)=%s"%(x_where_maxi_f, max_f)
+		
+
 if __name__ == '__main__':
 	if len(sys.argv) == 1:
 		print __doc__
@@ -147,7 +195,8 @@ if __name__ == '__main__':
 	TestCaseDict = {1:Problem2_2,
 		2:Problem2_3,
 		3:Problem3_3,
-		4:Problem3_15}
+		4:Problem3_15,
+		5: Problem5_1}
 	type = 0
 	for opt, arg in opts:
 		if opt in ("-h", "--help"):
