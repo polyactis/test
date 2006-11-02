@@ -16,6 +16,7 @@ Examples:
 3: Problem3_3
 4: Problem3_15
 5: Problem5_1
+6: Problem5_5
 """
 import sys, os, math
 bit_number = math.log(sys.maxint)/math.log(2)
@@ -147,6 +148,10 @@ class Problem5_1 (unittest.TestCase):
 		
 		The answer is x=0.379125, max(f)= 3.832543
 	"""
+	def setUp(self):
+		print
+		print "stochastic exploration to get maximum of (cos(50x)+sin(20x))^2"
+		
 	def test_basic(self, no_of_samples=1e6):
 		import random, math
 		f = -10	#initial value
@@ -165,9 +170,12 @@ class Problem5_1 (unittest.TestCase):
 		return math.pow((math.cos(50*x)+math.sin(20*x)), 2)
 	
 	def test_simulated_annealing(self, neighbor_range = 0.25, no_of_samples=1e6):
-		import random, math
+		import matplotlib; matplotlib.use("Agg")
+		import random, math, pylab
 		t = 2
-		x_where_maxi_f = 0.5	#initial x
+		x_where_maxi_f = 0	#initial x
+		x_list = [x_where_maxi_f]
+		f_list = [self.f_function(x_where_maxi_f)]
 		while t< no_of_samples:
 			u = random.uniform(max(x_where_maxi_f - neighbor_range, 0), min(x_where_maxi_f + neighbor_range, 1))
 			t_i = 0.01/math.log(t)
@@ -175,11 +183,128 @@ class Problem5_1 (unittest.TestCase):
 			random_prob = random.random()
 			if random_prob<=prob:
 				x_where_maxi_f = u
+				x_list.append(x_where_maxi_f)
+				f_list.append(self.f_function(x_where_maxi_f))
+			
 			t += 1
 		max_f = self.f_function(x_where_maxi_f)
 		print "x=%s, max(f)=%s"%(x_where_maxi_f, max_f)
-		
+		pylab.xlabel('Exploration')
+		pylab.ylabel('Function value')
+		pylab.plot(x_list, f_list, '-o')
+		pylab.savefig('prob5_1_simulated_annealing.png')
+		#pylab.show()
 
+class Problem5_5(unittest.TestCase):
+	"""
+	2006-11-01
+	
+	Interesting model, it seems it either reaches full +1 or -1 matrix.
+	"""
+	def setUp(self):
+		print
+		print "simulated annealing for Ising model"
+	
+	def pick_one_node(self, grid_length = 10):
+		import random
+		return (random.randint(0, grid_length-1), random.randint(0, grid_length-1))
+	
+	def cal_neighbor_score(self, node_pos , sign_matrix, grid_length):		
+		score = 0.0
+		if node_pos[0]-1 >= 0:
+			score += sign_matrix[node_pos[0]-1, node_pos[1]]
+		if node_pos[0]+1 <= grid_length-1:
+			score += sign_matrix[ node_pos[0]+1, node_pos[1]]
+		if node_pos[1]-1 >= 0:
+			score += sign_matrix[node_pos[0], node_pos[1]-1]
+		if node_pos[1]+1 <= grid_length-1:
+			score += sign_matrix[ node_pos[0], node_pos[1]+1]
+		return score
+	
+	def cal_matrix_score(self, sign_matrix, grid_length):
+		"""
+		2006-11-02
+			the calculation is (one-horizontal row, one-vertical row), alternating, total
+			so, horizontal is n-1 edges with n rows; vertical is n edges with n-1 times
+		"""
+		matrix_score = 0.0
+		for i in range(grid_length-1):	#the first horizontal row
+			matrix_score += sign_matrix[0, i]*sign_matrix[0, i+1]
+		for i in range(1, grid_length):
+			matrix_score += sign_matrix[i-1, 0]*sign_matrix[i, 0]	#the first vertical edge
+			for j in range(grid_length-1):
+				matrix_score += sign_matrix[i, j]* sign_matrix[i, j+1]
+				matrix_score += sign_matrix[i-1, j+1]*sign_matrix[i, j+1]
+		return matrix_score
+		
+	def modify_matrix_score(self, sign_matrix, node_pos, grid_length):
+		"""
+		2006-11-02
+			it's assumed, sign of node_pos is reversed.
+			The calculation is a lot simplification.
+				each edge score diff = new_sign*neighbor - old_sign*neighbor = -2*old_sign* neighbor
+				total score diff = -2 * old_sign * (\sigma neighbors)
+		"""
+		delta_score = 0.0	#the new score of four edges -  the old score
+		if node_pos[0]-1 >= 0:
+			delta_score += sign_matrix[node_pos[0]-1, node_pos[1]]
+		if node_pos[0]+1 <= grid_length-1:
+			delta_score += sign_matrix[ node_pos[0]+1, node_pos[1]]
+		if node_pos[1]-1 >= 0:
+			delta_score += sign_matrix[node_pos[0], node_pos[1]-1]
+		if node_pos[1]+1 <= grid_length-1:
+			delta_score += sign_matrix[ node_pos[0], node_pos[1]+1]
+		delta_score = -2*sign_matrix[ node_pos]*delta_score
+		return delta_score
+	
+	def test_Ising_model(self, no_of_samples=1e5, grid_length = 10, beta=0.4):
+		import matplotlib; matplotlib.use("Agg")
+		import Numeric, random, math, pylab
+		#sign_matrix = Numeric.ones(( grid_length, grid_length ))
+		sign_matrix = Numeric.array( [[-1,-1,-1,-1,-1,-1,-1,-1,-1,1,],
+			 [-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,],
+			 [-1,1,-1,-1,1,-1,-1,-1,1,-1,],
+			 [-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,],
+			 [-1,-1,-1,1,-1,-1,-1,-1,-1,-1,],
+			 [-1,-1,-1,1,-1,-1,-1,-1,-1,-1,],
+			 [-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,],
+			 [-1,-1,-1,1,1,1,-1,-1,-1,-1,],
+			 [1,-1,-1,-1,-1,-1,1,-1,-1,-1,],
+			 [-1,1,-1,-1,-1,-1,-1,-1,-1,1,]])
+		matrix_score = beta * self.cal_matrix_score(sign_matrix, grid_length)
+		score_list = [ matrix_score]
+		t = 2
+		while t< no_of_samples:
+			t_i = 1/math.log(t)
+			picked_node = self.pick_one_node(grid_length)
+			old_sign  = sign_matrix[ picked_node]
+			
+			score = 2*beta*self.cal_neighbor_score(picked_node, sign_matrix, grid_length)
+			exp_score = math.exp(score)
+			
+			bernoulli_prob = exp_score/(1 + exp_score)
+			random_prob = random.random()
+			if random_prob<= bernoulli_prob:
+				new_sign = 1
+			else:
+				new_sign = -1
+			if new_sign != old_sign:
+				delta_score = beta*self.modify_matrix_score(sign_matrix, picked_node, grid_length)
+				annealing_prob = min(math.exp( delta_score/t_i ), 1)
+				random_prob = random.random()
+				if random_prob <= annealing_prob:
+					sign_matrix[ picked_node] = new_sign	#changed after delta_score is got					
+					matrix_score = matrix_score + delta_score
+					score_list.append( matrix_score)
+			t += 1
+		print "matrix_score:", matrix_score
+		print "matrix:"
+		print sign_matrix
+		pylab.xlabel('Iterations')
+		pylab.ylabel('matrix score')
+		pylab.plot(range(len(score_list)) , score_list, '-o')
+		pylab.savefig('prob5_5_ising_model_score.png')
+					
 if __name__ == '__main__':
 	if len(sys.argv) == 1:
 		print __doc__
@@ -196,7 +321,8 @@ if __name__ == '__main__':
 		2:Problem2_3,
 		3:Problem3_3,
 		4:Problem3_15,
-		5: Problem5_1}
+		5: Problem5_1 ,
+		6: Problem5_5}
 	type = 0
 	for opt, arg in opts:
 		if opt in ("-h", "--help"):
