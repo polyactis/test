@@ -5233,16 +5233,20 @@ def draw_pie_charts_of_overlapping_tf_targets(curs, gene_table, output_dir, gene
 """
 2006-10-22
 	draw some histograms of haifeng's prediction output(p-value, m1_score)
+2006-10-31
+	draw histograms of all attributes
+2006-10-31
+	each entry of prediction_data has three columns
+	consider unknown data as a third color
+	fix a bug
 """
-def inspect_prediction_data_m1_score_and_p_value(input_fname):
+def inspect_prediction_data_m1_score_and_p_value(input_fname, output_dir):
 	import csv, numarray, math
 	import matplotlib; matplotlib.use("Agg")
 	import pylab
 	reader = csv.reader(open(input_fname), delimiter='\t')
-	p_value_correct_list = []
-	m1_score_correct_list = []
-	p_value_not_correct_list = []
-	m1_score_not_correct_list = []
+	prediction_data = [[[], [], []], [[], [], []], [[], [], []], [[], [], []], [[], [], []], [[], [], []], [[], [], []]]	#[[[],[]]]*7 doens't work. It'll link all five lists.
+	#7 entries corresponding to 7 attributes. For each attribute, index 0 is wrong, index 1 is correct, index 2(-1) is unknown
 	counter = 0
 	for row in reader:
 		pattern_id, unknown_percentage, no_of_vertices, no_of_edges, avg_degree, density, supports, vertex_id, \
@@ -5255,30 +5259,32 @@ def inspect_prediction_data_m1_score_and_p_value(input_fname):
 		m1_list = map(float, m1_list)
 		p_value_list = map(float, p_value_list)
 		go_index_with_max_m1_score = numarray.argmax(m1_list)
+		m1_score = m1_list[go_index_with_max_m1_score]
 		p_value = p_value_list[go_index_with_max_m1_score]
 		if p_value==0:
 			log_p_value = 50
 		else:
 			log_p_value = -math.log(p_value)
-		if go_binary_list[go_index_with_max_m1_score]=='1':
-			p_value_correct_list.append(log_p_value)
-			m1_score_correct_list.append(m1_list[go_index_with_max_m1_score])
-		else:
-			p_value_not_correct_list.append(log_p_value)
-			m1_score_not_correct_list.append(m1_list[go_index_with_max_m1_score])
+		
+		row = [log_p_value, m1_score, float(supports), float(density), int(no_of_vertices), float(avg_degree), float(unknown_percentage)]
+		is_correct = int(go_binary_list[go_index_with_max_m1_score])
+		if is_known=='0':	#2006-10-31
+			is_correct=-1
+		for i in range(len(row)):	#disregard the 1st entry, is_correct
+			prediction_data[i][is_correct].append(row[i])
+		
 		counter+=1
 		if counter%2000==0:
 			sys.stderr.write("%s%s"%('\x08'*20, counter))
 	sys.stderr.write("%s%s\n"%('\x08'*20, counter))
 	del reader
-	pylab.figure()
-	pylab.hist(m1_score_not_correct_list, 100, normed=1, alpha=0.5)
-	pylab.hist(m1_score_correct_list, 100, normed=1, alpha=0.5, facecolor='r', edgecolor='r')
-	pylab.savefig('m1_score_hist.png')
-	pylab.clf()
-	pylab.hist(p_value_not_correct_list, 100, normed=1, alpha=0.5)
-	pylab.hist(p_value_correct_list, 100, normed=1, alpha=0.5, facecolor='r', edgecolor='r')
-	pylab.savefig('p_value_hist.png')
+	
+	if not os.path.isdir(output_dir):
+		os.makedirs(output_dir)
+	property_label_list = ['p_value', 'm1_score', 'recurrence', 'density', 'cluster_size', 'avg_degree', 'unknown_ratio']
+	for i in range(len(property_label_list)):
+		histogram_fname = os.path.join(output_dir, 'histogram_%s'%(property_label_list[i]))
+		draw_two_color_histogram(prediction_data[i], property_label_list[i], histogram_fname)
 
 
 def inspect_recurrence_size_scatter(curs, pattern_table):
@@ -5456,40 +5462,44 @@ def inspect_all_patterns_edge_freq(curs, pattern_table, edge_freq_hist_output_fn
 """
 2006-10-26
 	draw some histograms of p_gene table(p-value, m1_score)
+2006-10-31
+	look at more attributes than m1_score and p_value
+	call draw_two_color_histogram()
 """
-def inspect_p_gene_table_m1_score_and_p_value(curs, p_gene_table, m1_score_histogram_fname, p_value_histogram_fname):
+def inspect_p_gene_table_m1_score_and_p_value(curs, p_gene_table, output_dir):
 	import csv, numarray, math
 	import matplotlib; matplotlib.use("Agg")
 	import pylab
-	curs.execute("DECLARE crs1 CURSOR FOR SELECT is_correct, avg_p_value, edge_gradient from %s"%p_gene_table)
+	curs.execute("DECLARE crs1 CURSOR FOR SELECT is_correct, avg_p_value, edge_gradient, recurrence_cut_off, \
+			connectivity_cut_off, cluster_size_cut_off, vertex_gradient, unknown_cut_off from %s"%p_gene_table)
 	curs.execute("fetch 5000 from crs1")
 	rows = curs.fetchall()
-	p_value_list = [[],[]]	#index 0 is wrong, 1 is correct
-	m1_score_list = [[], []]
+	prediction_data = [[[], [], []], [[], [], []], [[], [], []], [[], [], []], [[], [], []], [[], [], []], [[], [], []]]	#[[[],[]]]*7 doens't work. It'll link all five lists.
+	#7 entries corresponding to 7 attributes. For each attribute, index 0 is wrong, index 1 is correct, index 2 is unknown
 	counter = 0
 	while rows:
 		for row in rows:
-			is_correct, p_value, m1_score = row
+			is_correct, p_value, m1_score, recurrence, connectivity, cluster_size, avg_degree, unknown_ratio = row
 			if p_value==0:
 				log_p_value = 50
 			else:
 				log_p_value = -math.log(p_value)
-			p_value_list[is_correct].append(log_p_value)
-			m1_score_list[is_correct].append(m1_score)
+			row = [log_p_value, m1_score, recurrence, connectivity, cluster_size, avg_degree, unknown_ratio]
+			for i in range(len(row)):	#disregard the 1st entry, is_correct
+				prediction_data[i][is_correct].append(row[i])
 			counter+=1
 		curs.execute("fetch 5000 from crs1")
 		rows = curs.fetchall()
 		sys.stderr.write("%s%s"%('\x08'*20, counter))
 	sys.stderr.write("%s%s\n"%('\x08'*20, counter))
 	curs.execute("close crs1")
-	pylab.figure()
-	pylab.hist(m1_score_list[0], 100, normed=1, alpha=0.5)
-	pylab.hist(m1_score_list[1], 100, normed=1, alpha=0.5, facecolor='r', edgecolor='r')
-	pylab.savefig(m1_score_histogram_fname)
-	pylab.clf()
-	pylab.hist(p_value_list[0], 100, normed=1, alpha=0.5)
-	pylab.hist(p_value_list[1], 100, normed=1, alpha=0.5, facecolor='r', edgecolor='r')
-	pylab.savefig(p_value_histogram_fname)
+	
+	if not os.path.isdir(output_dir):
+		os.makedirs(output_dir)
+	property_label_list = ['p_value', 'm1_score', 'recurrence', 'density', 'cluster_size', 'avg_degree', 'unknown_ratio']
+	for i in range(len(property_label_list)):
+		histogram_fname = os.path.join(output_dir, 'histogram_%s'%(property_label_list[i]))
+		draw_two_color_histogram(prediction_data[i], property_label_list[i], histogram_fname)
 
 """
 2006-10-26
@@ -5562,18 +5572,29 @@ def draw_two_color_scatter_plot(x_data, y_data, x_label, y_label, output_fname):
 	sys.stderr.write("done.\n")
 
 def draw_two_color_histogram(data, label, output_fname):
+	"""
+	2006-10-31
+		add a histogram for the 3rd entry of data if present
+	"""
 	sys.stderr.write("Drawing histogram %s ..."%label)
 	import matplotlib; matplotlib.use("Agg")
 	import pylab
 	pylab.figure()
 	pylab.xlabel(label)
-	pylab.hist(data[0], 100, normed=1, alpha=0.5)
-	pylab.hist(data[1], 100, normed=1, alpha=0.5, facecolor='r', edgecolor='r')
+	pylab.hist(data[0], 100, normed=1, alpha=0.4)
+	pylab.hist(data[1], 100, normed=1, alpha=0.4, facecolor='r', edgecolor='r')
+	if len(data)==3	#2006-10-31
+		if len(data[2])>5:
+		pylab.hist(data[2], 100, normed=1, alpha=0.4, facecolor='g', edgecolor='g')
 	pylab.savefig(output_fname)
 	pylab.clf()
 	sys.stderr.write("done.\n")
 
-def inspect_prediction_data_by_pylab(input_fname, output_dir):
+def inspect_patterns_in_prediction_data_by_pylab(input_fname, output_dir):
+	"""
+	2006-10-31
+		fix a bug, is_known=0 should be excluded
+	"""
 	import csv, numarray, math
 	reader = csv.reader(open(input_fname), delimiter='\t')
 	counter = 0
@@ -5590,10 +5611,11 @@ def inspect_prediction_data_by_pylab(input_fname, output_dir):
 		go_index_with_max_m1_score = numarray.argmax(m1_list)
 		p_value = p_value_list[go_index_with_max_m1_score]
 		is_correct = int(go_binary_list[go_index_with_max_m1_score])
-		if pattern_id not in pattern_id2properties:
-			pattern_id2properties[pattern_id] = [0.0, 0.0, int(supports), int(no_of_vertices), float(density), float(avg_degree), \
-				float(unknown_percentage)]	#the first two 0,0 are for #wrong, #correct respectively
-		pattern_id2properties[pattern_id][is_correct]+=1
+		if is_known=='1':	#2006-10-31
+			if pattern_id not in pattern_id2properties:
+				pattern_id2properties[pattern_id] = [0.0, 0.0, int(supports), int(no_of_vertices), float(density), float(avg_degree), \
+					float(unknown_percentage)]	#the first two 0,0 are for #wrong, #correct respectively
+			pattern_id2properties[pattern_id][is_correct]+=1
 		
 		counter += 1
 		if counter%5000==0:
