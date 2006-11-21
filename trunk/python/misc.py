@@ -4567,95 +4567,6 @@ def go_correlation_coherence(cor_fname, go_fname, output_dir):
 		pylab.savefig(os.path.join(output_dir,fig_fname))
 
 
-"""
-2006-09-12
-	draw a graph , with nodes as GO node,  size proportional to how many genes it has,
-		edge due to sharing of genes between GO nodes, edge width proportional to how many
-		genes are shared
-	
-	call get_go_id2gene_set() from upstairs
-"""
-def draw_GO_node_structure_graph(go_id2gene_set, fig_output_fname, sharing_threshold=30, label_map=None, is_to_show=1):
-	sys.stderr.write("Drawing GO node structure graph...")
-	import networkx as nx
-	import pylab
-	pylab.clf()	#clear the figure
-	g = nx.XGraph()
-	go_id_list = go_id2gene_set.keys()
-	no_of_go_ids = len(go_id_list)
-	for i in range(no_of_go_ids):
-		for j in range(i+1, no_of_go_ids):
-			go_id1 = go_id_list[i]
-			go_id2 = go_id_list[j]
-			no_of_sharing_genes = len(go_id2gene_set[go_id1]&go_id2gene_set[go_id2])
-			if no_of_sharing_genes>=sharing_threshold:
-				g.add_edge(go_id1, go_id2, no_of_sharing_genes)
-	edge_width_list = []
-	for (u, v, d) in g.edges():
-		edge_width_list.append(d/5)
-	node_size_list = []
-	for v in g:
-		node_size_list.append(len(go_id2gene_set[v])*4)
-	pos=nx.graphviz_layout(g)
-	pylab.figure(1, figsize=(250,250))
-	nx.draw_networkx_edges(g,pos,
-		alpha=0.3,
-		width=edge_width_list,
-		edge_color='m')
-	nx.draw_networkx_nodes(g,pos,
-		node_size=node_size_list,
-		node_color='r',
-		alpha=0.4)
-	nx.draw_networkx_edges(g,pos,
-		alpha=0.4,
-		node_size=0,
-		width=1,
-		edge_color='k')
-	abr_label_map = {}
-	if label_map:
-		#don't give a dictionary with keys more than the nodes, (it'll get error)
-		for key in g:
-			if key in label_map:
-				abr_label_map[key] = label_map[key]
-	if abr_label_map:
-		nx.draw_networkx_labels(g, pos, abr_label_map, fontsize=6)
-	else:
-		nx.draw_networkx_labels(g, pos, fontsize=6)
-	#give a title
-	pylab.title(fig_output_fname)
-	#write the legend
-	xmin, xmax, ymin, ymax = pylab.axis()
-	dx = xmax - xmin
-	dy = ymax - ymin
-	x = 0.02*dx + xmin
-	y = 0.95*dy + ymin
-	pylab.text(x, y, "edge cutoff: %s"%sharing_threshold)
-	pylab.savefig(fig_output_fname, dpi=750)
-	if is_to_show:
-		pylab.show()
-	sys.stderr.write("Done.\n")
-
-def get_go_id2gene_set_from_prediction_cut_file(prediction_cut_fname):
-	"""
-	2006-09-13
-		prediction_cut_fname is output of PredictionAccCurve.py
-	"""
-	import sys
-	sys.stderr.write("Getting go_id2gene_set...")
-	import csv
-	reader = csv.reader(open(prediction_cut_fname), delimiter='\t')
-	from sets import Set
-	go_id2gene_set  = {}
-	for row in reader:
-		vertex_id, pattern_id, go_id, is_known, is_correct, m1_score, p_value = row
-		if go_id not in go_id2gene_set:
-			go_id2gene_set[go_id] = Set()
-		go_id2gene_set[go_id].add(int(vertex_id))
-	del reader
-	sys.stderr.write("Done.\n")
-	return go_id2gene_set
-
-
 def tss_cds_distance_histogram(curs, tax_id=9606, entrezgene_mapping_table='sequence.entrezgene_mapping', \
 		annot_assembly_table = 'sequence.annot_assembly'):
 	"""
@@ -5643,9 +5554,130 @@ def inspect_patterns_in_prediction_data_by_pylab(input_fname, output_dir):
 		for j in range(i+1, 5):
 			scatter_plot_fname = os.path.join(output_dir, 'scatterplot_%s_%s'%(property_label_list[i], property_label_list[j]))
 			draw_two_color_scatter_plot(prediction_data[i], prediction_data[j], property_label_list[i], property_label_list[j], scatter_plot_fname)
-			
 
+"""
+2006-11-19
+	three functions below used to investigate the extent of difference among the condition's and vertex_set's based on which
+		a gene is projected into different function
+	ex:
+		compare_gene_condition_vertex_set(curs, 'p_gene_hs_fim_65_n2s200_m5x65s4l5_ft2_e5',\
+			'gene_p_hs_fim_65_n2s200_m5x65s4l5_ft2_e5_000001a60', 'good_cl_hs_fim_65_n2s200_m5x65s4l5_ft2_e5_000001a60',\
+			'tmp/gene_condition_vertex_set.hs_fim_65_n2s200_m5x65s4l5_ft2.cmp')
 	
+"""
+def get_fisher_p_value_of_two_lists(recurrence_array1, recurrence_array2):
+	import rpy
+	contigency_table = [[0,0], [0,0]]
+	for i in range(len(recurrence_array1)):
+		contigency_table[recurrence_array1[i]][recurrence_array2[i]] += 1
+	flat_list = [contigency_table[0][0], contigency_table[0][1], contigency_table[1][0], contigency_table[1][1]]
+	contigency_matrix = rpy.r.matrix(flat_list, 2,2, byrow=rpy.r.TRUE)
+	p_value = rpy.r.fisher_test(contigency_matrix)['p.value']
+	return [contigency_table, p_value]
+
+
+def get_mcl_id_sharing(mcl_id_go_no_list, mcl_id2recurrence_array_vertex_set):
+	no_of_mcl_ids = len(mcl_id_go_no_list)
+	result = []
+	if no_of_mcl_ids>1:
+		for i in range(no_of_mcl_ids):
+			for j in range(i+1, no_of_mcl_ids):
+				mcl_id1, go_no1 = mcl_id_go_no_list[i]
+				mcl_id2, go_no2 = mcl_id_go_no_list[j]
+				recurrence_array1, vertex_set1 = mcl_id2recurrence_array_vertex_set[mcl_id1]
+				recurrence_array2, vertex_set2 = mcl_id2recurrence_array_vertex_set[mcl_id2]
+				contigency_table, p_value = get_fisher_p_value_of_two_lists(recurrence_array1, recurrence_array2)
+				vertex_sharing_perc = float(len(vertex_set1&vertex_set2))/len(vertex_set1|vertex_set2)
+				result.append([mcl_id1, go_no1, mcl_id2, go_no2, contigency_table, p_value, vertex_sharing_perc])
+	return result
+
+
+def compare_gene_condition_vertex_set(curs, p_gene_table, gene_p_table, good_cluster_table, output_fname):
+	import os, sys, csv
+	from sets import Set
+	from codense.common import pg_1d_array2python_ls
+	sys.stderr.write("Getting gene_no2mcl_id_go_no_list ...\n")
+	gene_no2mcl_id_go_no_list = {}
+	curs.execute("DECLARE crs1 CURSOR for select p.gene_no, p.mcl_id, p.go_no from %s p, %s g\
+		where p.p_gene_id=g.p_gene_id"%(p_gene_table, gene_p_table))
+	counter = 0
+	curs.execute("fetch 1000 from crs1")
+	rows = curs.fetchall()
+	mcl_id_set = Set()
+	while rows:
+		for row in rows:
+			gene_no, mcl_id, go_no = row
+			mcl_id_set.add(mcl_id)
+			if gene_no not in gene_no2mcl_id_go_no_list:
+				gene_no2mcl_id_go_no_list[gene_no] = []
+			gene_no2mcl_id_go_no_list[gene_no].append([mcl_id, go_no])
+			counter += 1
+		sys.stderr.write("%s%s"%('\x08'*30, counter))
+		curs.execute("fetch 1000 from crs1")
+		rows = curs.fetchall()
+	curs.execute("close crs1")
+	sys.stderr.write("Done.\n")
+	
+	sys.stderr.write("Getting mcl_id2recurrence_array_vertex_set ...\n")
+	mcl_id2recurrence_array_vertex_set = {}
+	curs.execute("DECLARE crs0 CURSOR for select mcl_id, vertex_set, recurrence_array from %s"%good_cluster_table)
+	counter = 0
+	curs.execute("fetch 1000 from crs0")
+	rows = curs.fetchall()
+	while rows:
+		for row in rows:
+			mcl_id, vertex_set, recurrence_array = row
+			vertex_set = pg_1d_array2python_ls(vertex_set)
+			recurrence_array = pg_1d_array2python_ls(recurrence_array)
+			mcl_id2recurrence_array_vertex_set[mcl_id] =	[recurrence_array, Set(vertex_set)]
+			counter += 1
+		sys.stderr.write("%s%s"%('\x08'*30, counter))
+		curs.execute("fetch 1000 from crs0")
+		rows = curs.fetchall()
+	curs.execute("close crs0")
+	sys.stderr.write("Done.\n")
+	
+	sys.stderr.write("Comparing gene condition and vertex_set ...\n")
+	writer = csv.writer(open(output_fname, 'w'), delimiter='\t')
+	for gene_no, mcl_id_go_no_list in gene_no2mcl_id_go_no_list.iteritems():
+		cmp_condition_vertex_result = get_mcl_id_sharing(mcl_id_go_no_list, mcl_id2recurrence_array_vertex_set)
+		for row in cmp_condition_vertex_result:
+			writer.writerow([gene_no]+row)
+	sys.stderr.write("Done.\n")
+
+
+"""
+2006-11-19
+"""
+def get_dataset_no2description(curs, schema=None):
+	if schema:
+		curs.execute("set search_path to %s"%schema)
+	dataset_no2description = {}
+	curs.execute("select dataset_no, dataset_id, title from dataset_no2id_geo_view")
+	rows = curs.fetchall()
+	for row in rows:
+		dataset_no, dataset_id, title = row
+		dataset_no2description[dataset_no] = '%s, %s'%(dataset_id, title)
+	curs.execute("select dataset_no, dataset_id, category, subcategory, experimenter from dataset_no2id_smd_view")
+	rows = curs.fetchall()
+	for row in rows:
+		dataset_no, dataset_id, category, subcategory, experimenter = row
+		dataset_no2description[dataset_no] = '%s, %s, %s, %s'%(dataset_id, category, subcategory, experimenter)
+	return dataset_no2description
+
+def display_pattern_condition(curs, mcl_id, pattern_table, dataset_no2description):
+	from codense.common import pg_1d_array2python_ls
+	curs.execute("select recurrence_array from %s where id=%s"%(pattern_table, mcl_id))
+	rows = curs.fetchall()
+	recurrence_array = rows[0][0]
+	recurrence_array = pg_1d_array2python_ls(recurrence_array, float)
+	occurrence_cutoff_func = lambda x: int(x>=0.8)
+	recurrence_array = map(occurrence_cutoff_func, recurrence_array)
+	for i in range(len(recurrence_array)):
+		if recurrence_array[i] == 1:
+			print i+1, dataset_no2description[i+1]
+	
+
 #01-03-06 for easy console
 import sys, os, math
 bit_number = math.log(sys.maxint)/math.log(2)
