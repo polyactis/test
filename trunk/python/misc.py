@@ -3953,7 +3953,97 @@ def function_homogeneity_of_summary_graph_edges(input_fname, curs, schema):
 		print "\tvariance", r.var(edge_freq2similarity_ls[frequency])
 	
 	return edge_freq2similarity_ls, freq_list, avg_similarity_list, no_of_entries_list
+
+"""
+2006-12-07
+	This function inspects how function similarity is related to the recurrence of an edge
+
+	input_fname is the output of haifeng's sigvector.sh
+	go_fname is the output of go_informative_node.py in haifeng_annot
+"""
+def function_homogeneity_of_sig_vector_edges(input_fname, go_fname):
+	from sets import Set
+	import csv
+	sys.stderr.write("Getting gene_no2go_no_set(only known)...")
+	gene_no2go_no_set = {}
+	f = open(go_fname)
+	f.readline() #remove title line
+	for line in f:
+		row = map(int,line.strip().split())	#gene_no, is_known, go_bit1, go_bit2, ...
+		if row[1]==1:	#known gene
+			gene_no2go_no_set[row[0]] = Set()
+			for i in range(2, len(row)):
+				if row[i] == 1:
+					gene_no2go_no_set[row[0]].add(i-1)	#i-1 starts from 1
+	del f
+	sys.stderr.write("Done.\n")
 	
+	sys.stderr.write("Reading edges...")
+	edge_freq2similarity_ls = {}
+	reader = csv.reader(open(input_fname), delimiter='\t')
+	for row in reader:
+		row = map(int, row)
+		gene_no1 = row[0]
+		gene_no2 = row[1]
+		frequency = sum(row[2:])
+		if (gene_no1 in gene_no2go_no_set) and (gene_no2 in gene_no2go_no_set):
+			similarity = float(len(gene_no2go_no_set[gene_no1]&gene_no2go_no_set[gene_no2]))/len(gene_no2go_no_set[gene_no1]|gene_no2go_no_set[gene_no2])
+			if frequency not in edge_freq2similarity_ls:
+				edge_freq2similarity_ls[frequency] = []
+			#if len(edge_freq2similarity_ls[frequency])<=1e6:	#2006-12-08 add an upper limit
+			edge_freq2similarity_ls[frequency].append(similarity)
+	sys.stderr.write("Done.\n")
+	return edge_freq2similarity_ls
+
+"""
+2006-12-11
+	draw a plot between frequency and average similarity returned by function above
+		if no of edges with that frequency is less than 100, ignore it
+	output_fname is just a prefix. no 'png', 'eps', 'svg' suffices
+"""
+def plot_edge_function_homogeneity(edge_freq2similarity_ls, output_fname, edge_freq_threshold=100, barchart=0):
+	from rpy import r
+	from MA import average
+	freq_list = edge_freq2similarity_ls.keys()
+	freq_list.sort()
+	avg_similarity_list = []
+	sd_of_avg_similarity_list = []
+	no_of_entries_list = []
+	for frequency in freq_list:
+		print "frequency", frequency
+		avg_similarity = average(edge_freq2similarity_ls[frequency])
+		avg_similarity_list.append(avg_similarity)
+		sd_of_avg_similarity = r.sd(edge_freq2similarity_ls[frequency])
+		sd_of_avg_similarity_list.append(sd_of_avg_similarity)
+		no_of_entries_list.append(len(edge_freq2similarity_ls[frequency]))
+		
+		print "\tnumber of entries", len(edge_freq2similarity_ls[frequency])
+		print "\taverage similarity", avg_similarity
+		print "\tstandard deviation", sd_of_avg_similarity
+	import matplotlib; matplotlib.use("Agg")
+	import pylab
+	pylab.clf()
+	pylab.xlabel("edge frequency")
+	pylab.ylabel("average similarity")
+	truncated_index = len(no_of_entries_list)
+	for i in range(len(no_of_entries_list)):
+		if no_of_entries_list[i]<edge_freq_threshold:
+			truncated_index = i
+			break
+	#[:i] is 0, 1, ... , i-1
+	if barchart:
+		ind = pylab.arange(truncated_index)	# the x locations for the groups, arange() ensures that ind+width could work
+		#range() can't work for ind+width
+		width = 0.35	# the width of the bars
+		pylab.bar(ind, avg_similarity_list[:truncated_index], width, yerr=sd_of_avg_similarity_list[:truncated_index])
+		pylab.xticks(ind+width/2, map(repr, freq_list[:truncated_index]))	#tick's type must be string or text or something.
+		pylab.xlim(-width,len(ind))
+	else:
+		pylab.plot(freq_list[:truncated_index], avg_similarity_list[:truncated_index], '-o')
+	pylab.savefig('%s.png'%output_fname, dpi=200)
+	pylab.savefig('%s.eps'%output_fname, dpi=200)
+	pylab.savefig('%s.svg'%output_fname, dpi=200)
+
 
 """
 02-28-06
@@ -5555,96 +5645,6 @@ def inspect_patterns_in_prediction_data_by_pylab(input_fname, output_dir):
 			scatter_plot_fname = os.path.join(output_dir, 'scatterplot_%s_%s'%(property_label_list[i], property_label_list[j]))
 			draw_two_color_scatter_plot(prediction_data[i], prediction_data[j], property_label_list[i], property_label_list[j], scatter_plot_fname)
 
-"""
-2006-11-19
-	three functions below used to investigate the extent of difference among the condition's and vertex_set's based on which
-		a gene is projected into different function
-	ex:
-		compare_gene_condition_vertex_set(curs, 'p_gene_hs_fim_65_n2s200_m5x65s4l5_ft2_e5',\
-			'gene_p_hs_fim_65_n2s200_m5x65s4l5_ft2_e5_000001a60', 'good_cl_hs_fim_65_n2s200_m5x65s4l5_ft2_e5_000001a60',\
-			'tmp/gene_condition_vertex_set.hs_fim_65_n2s200_m5x65s4l5_ft2.cmp')
-	
-"""
-def get_fisher_p_value_of_two_lists(recurrence_array1, recurrence_array2):
-	import rpy
-	contigency_table = [[0,0], [0,0]]
-	for i in range(len(recurrence_array1)):
-		contigency_table[recurrence_array1[i]][recurrence_array2[i]] += 1
-	flat_list = [contigency_table[0][0], contigency_table[0][1], contigency_table[1][0], contigency_table[1][1]]
-	contigency_matrix = rpy.r.matrix(flat_list, 2,2, byrow=rpy.r.TRUE)
-	p_value = rpy.r.fisher_test(contigency_matrix)['p.value']
-	return [contigency_table, p_value]
-
-
-def get_mcl_id_sharing(mcl_id_go_no_list, mcl_id2recurrence_array_vertex_set):
-	no_of_mcl_ids = len(mcl_id_go_no_list)
-	result = []
-	if no_of_mcl_ids>1:
-		for i in range(no_of_mcl_ids):
-			for j in range(i+1, no_of_mcl_ids):
-				mcl_id1, go_no1 = mcl_id_go_no_list[i]
-				mcl_id2, go_no2 = mcl_id_go_no_list[j]
-				recurrence_array1, vertex_set1 = mcl_id2recurrence_array_vertex_set[mcl_id1]
-				recurrence_array2, vertex_set2 = mcl_id2recurrence_array_vertex_set[mcl_id2]
-				contigency_table, p_value = get_fisher_p_value_of_two_lists(recurrence_array1, recurrence_array2)
-				vertex_sharing_perc = float(len(vertex_set1&vertex_set2))/len(vertex_set1|vertex_set2)
-				result.append([mcl_id1, go_no1, mcl_id2, go_no2, contigency_table, p_value, vertex_sharing_perc])
-	return result
-
-
-def compare_gene_condition_vertex_set(curs, p_gene_table, gene_p_table, good_cluster_table, output_fname):
-	import os, sys, csv
-	from sets import Set
-	from codense.common import pg_1d_array2python_ls
-	sys.stderr.write("Getting gene_no2mcl_id_go_no_list ...\n")
-	gene_no2mcl_id_go_no_list = {}
-	curs.execute("DECLARE crs1 CURSOR for select p.gene_no, p.mcl_id, p.go_no from %s p, %s g\
-		where p.p_gene_id=g.p_gene_id"%(p_gene_table, gene_p_table))
-	counter = 0
-	curs.execute("fetch 1000 from crs1")
-	rows = curs.fetchall()
-	mcl_id_set = Set()
-	while rows:
-		for row in rows:
-			gene_no, mcl_id, go_no = row
-			mcl_id_set.add(mcl_id)
-			if gene_no not in gene_no2mcl_id_go_no_list:
-				gene_no2mcl_id_go_no_list[gene_no] = []
-			gene_no2mcl_id_go_no_list[gene_no].append([mcl_id, go_no])
-			counter += 1
-		sys.stderr.write("%s%s"%('\x08'*30, counter))
-		curs.execute("fetch 1000 from crs1")
-		rows = curs.fetchall()
-	curs.execute("close crs1")
-	sys.stderr.write("Done.\n")
-	
-	sys.stderr.write("Getting mcl_id2recurrence_array_vertex_set ...\n")
-	mcl_id2recurrence_array_vertex_set = {}
-	curs.execute("DECLARE crs0 CURSOR for select mcl_id, vertex_set, recurrence_array from %s"%good_cluster_table)
-	counter = 0
-	curs.execute("fetch 1000 from crs0")
-	rows = curs.fetchall()
-	while rows:
-		for row in rows:
-			mcl_id, vertex_set, recurrence_array = row
-			vertex_set = pg_1d_array2python_ls(vertex_set)
-			recurrence_array = pg_1d_array2python_ls(recurrence_array)
-			mcl_id2recurrence_array_vertex_set[mcl_id] =	[recurrence_array, Set(vertex_set)]
-			counter += 1
-		sys.stderr.write("%s%s"%('\x08'*30, counter))
-		curs.execute("fetch 1000 from crs0")
-		rows = curs.fetchall()
-	curs.execute("close crs0")
-	sys.stderr.write("Done.\n")
-	
-	sys.stderr.write("Comparing gene condition and vertex_set ...\n")
-	writer = csv.writer(open(output_fname, 'w'), delimiter='\t')
-	for gene_no, mcl_id_go_no_list in gene_no2mcl_id_go_no_list.iteritems():
-		cmp_condition_vertex_result = get_mcl_id_sharing(mcl_id_go_no_list, mcl_id2recurrence_array_vertex_set)
-		for row in cmp_condition_vertex_result:
-			writer.writerow([gene_no]+row)
-	sys.stderr.write("Done.\n")
-
 
 """
 2006-11-19
@@ -5676,6 +5676,42 @@ def display_pattern_condition(curs, mcl_id, pattern_table, dataset_no2descriptio
 	for i in range(len(recurrence_array)):
 		if recurrence_array[i] == 1:
 			print i+1, dataset_no2description[i+1]
+
+"""
+2006-12-11
+	pattern_table could be a good_cluster_table
+"""
+def draw_connectivity_histogram_of_table(curs, pattern_table, output_fname):
+	sys.stderr.write("Getting connectivity_ls ...\n")
+	connectivity_ls = []
+	curs.execute("DECLARE crs0 CURSOR for select connectivity from %s"%pattern_table)
+	counter = 0
+	curs.execute("fetch 1000 from crs0")
+	rows = curs.fetchall()
+	while rows:
+		for row in rows:
+			connectivity_ls.append(row[0])
+			counter += 1
+		sys.stderr.write("%s%s"%('\x08'*30, counter))
+		curs.execute("fetch 1000 from crs0")
+		rows = curs.fetchall()
+	curs.execute("close crs0")
+	sys.stderr.write("Done.\n")
+	
+	import matplotlib; matplotlib.use("Agg")
+	import pylab
+	pylab.clf()
+	pylab.title('histogram of connectivity of patterns')
+	pylab.xlabel('connectivity')
+	pylab.hist(connectivity_ls, 40, normed=1, alpha=0.4)
+	pylab.savefig('%s.png'%output_fname, dpi=200)
+	pylab.savefig('%s.eps'%output_fname, dpi=200)
+	pylab.savefig('%s.svg'%output_fname, dpi=200)
+
+"""
+2006-12-17
+"""
+def get_genes_pred_certain_function(curs, go_no, p_gene_table, gene_p_table, pattern_table, bs_no_table_list):
 	
 
 #01-03-06 for easy console
