@@ -5710,9 +5710,93 @@ def draw_connectivity_histogram_of_table(curs, pattern_table, output_fname):
 
 """
 2006-12-17
+	mainly to search for some "mitotic cell cycle" (or other function) genes so that jasmine could ask 
+	her friend to validate though it's questionable whether they are gonna give help
 """
-def get_genes_pred_certain_function(curs, go_no, p_gene_table, gene_p_table, pattern_table, bs_no_table_list):
+def get_genes_pred_certain_function(curs, output_fname, gene_id2gene_symbol, go_no, p_gene_table, gene_p_table, pattern_table, bs_no_table_list=[]):
+	sys.stderr.write("Getting genes predicted to function %s...\n"%go_no)
+	curs.execute("select p.gene_no, p.mcl_id, p.edge_gradient, p.p_value_cut_off, p.is_correct from %s p,\
+		%s g where p.p_gene_id=g.p_gene_id and p.go_no=%s"%(p_gene_table, gene_p_table, go_no))
+	rows = curs.fetchall()
+	import csv
+	from sets import Set
+	writer = csv.writer(open(output_fname, 'w'), delimiter='\t')
+	header_row = ['gene', 'mcl_id', 'network topology score', 'hypergeometric p-value', 'is_correct', 'gene description',\
+		'vertex_set', 'edge_set', 'bs_no_list']
+	writer.writerow(header_row)
+	for row in rows:
+		row = list(row)
+		gene_id = row[0]
+		row[0] = '%s(gene_id=%s)'%(gene_id2gene_symbol[gene_id], gene_id)
+		
+		curs.execute("select description from gene.gene where gene_id=%s"%gene_id)
+		data = curs.fetchall()
+		row.append(data[0][0])
+		
+		mcl_id = row[1]
+		curs.execute("select vertex_set, edge_set from %s where id=%s"%(pattern_table, mcl_id))
+		data = curs.fetchall()
+		vertex_set, edge_set = data[0]
+		row.append(vertex_set)
+		row.append(edge_set)
+		
+		bs_no_set = Set()
+		for bs_no_table in bs_no_table_list:
+			curs.execute("select bs_no_list from %s where mcl_id=%s"%(bs_no_table, mcl_id))
+			data = curs.fetchall()
+			for data_row in data:
+				data_row = data_row[0][1:-1].split(',')
+				data_row = map(int, data_row)
+				for bs_no in data_row:
+					bs_no_set.add(gene_id2gene_symbol[bs_no])
+		bs_no_list = list(bs_no_set)
+		bs_no_list.sort()
+		row.append(bs_no_list)
+		writer.writerow(row)
+	del writer
 	
+	sys.stderr.write('Done.\n')
+
+
+"""
+2006-12-28
+	calculate the percentage of protein-interacting vertices among a pattern,
+	output sorted by the percentage
+"""
+def cal_pattern_prot_int_perc(curs, good_cluster_table, aug_pi_table, output_fname):
+	import csv, sys, os
+	from sets import Set
+	curs.execute("DECLARE crs CURSOR FOR select g.mcl_id, g.vertex_set, a.vertex_set from %s g, %s a where g.mcl_id=a.mcl_id"\
+		%(good_cluster_table, aug_pi_table))
+	counter = 0
+	pi_perc_mcl_id_ls = []
+	curs.execute("fetch 1000 from crs")
+	rows = curs.fetchall()
+	while rows:
+		for row in rows:
+			mcl_id, pattern_vertex_set, pi_vertex_set = row
+			pattern_vertex_set = pattern_vertex_set[1:-1].split(',')
+			pattern_vertex_set = Set(map(int, pattern_vertex_set))
+			if pi_vertex_set=='{}':
+				perc = 0.0
+			else:
+				pi_vertex_set = pi_vertex_set[1:-1].split(',')
+				pi_vertex_set = Set(map(int, pi_vertex_set))
+				perc = len(pattern_vertex_set&pi_vertex_set)/float(len(pattern_vertex_set))
+			pi_perc_mcl_id_ls.append([perc, mcl_id])
+			counter += 1
+		sys.stderr.write("%s%s"%('\x08'*30, counter))
+		curs.execute("fetch 1000 from crs")
+		rows = curs.fetchall()
+	curs.execute("close crs")
+	writer = csv.writer(open(output_fname, 'w'), delimiter='\t')
+	pi_perc_mcl_id_ls.sort()
+	for row in pi_perc_mcl_id_ls:
+		writer.writerow(row)
+	del writer
+	sys.stderr.write("Done.\n")
+	return pi_perc_mcl_id_ls
+
 
 #01-03-06 for easy console
 import sys, os, math
