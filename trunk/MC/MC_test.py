@@ -17,6 +17,7 @@ Examples:
 4: Problem3_15
 5: Problem5_1
 6: Problem5_5
+7: Problem7_1
 """
 import sys, os, math
 bit_number = math.log(sys.maxint)/math.log(2)
@@ -304,7 +305,91 @@ class Problem5_5(unittest.TestCase):
 		pylab.ylabel('matrix score')
 		pylab.plot(range(len(score_list)) , score_list, '-o')
 		pylab.savefig('prob5_5_ising_model_score.png')
-					
+
+class Problem7_1(unittest.TestCase):
+	"""
+	2007-01-23
+	
+	Robert & Casella 2005, mean of Gamma(4.3,6.2)
+	"""
+	def setUp(self):
+		print
+	
+	def output_and_plot(self, accept_ratio, sample_list, alpha, beta, a, b, sample_mean_list):
+		import rpy, pylab, math, random
+		print "mean is %s"%(rpy.r.mean(sample_list))
+		print "accept ratio is %s"%(accept_ratio)
+		n, bins, patches = pylab.hist(sample_list, 100, normed=1)
+		pylab.title("Histogram. Red is Gamma(%s,%s). Gamma by Gamma, accept_ratio:%s"%(alpha, beta, accept_ratio))
+		y = rpy.r.dgamma(bins, alpha, beta)
+		z = rpy.r.dgamma(bins, a, b)
+		l = pylab.plot(bins, y, 'r-')
+		m = pylab.plot(bins, z, 'g-')
+		pylab.show()
+		print "mean is %s"%sample_mean_list[-1]
+		pylab.title("Convergence of mean")
+		pylab.plot(range(len(sample_list)), sample_mean_list, 'b-')
+		pylab.show()
+	
+	def test_accept_reject(self, no_of_samples=10000, alpha=4.3, beta=6.2, a=4, b=6):
+		"""
+		2007-01-23
+			Gamma(4,7) doesn't work due to the monotonic increase of the ratio to infiniti.
+		"""
+		print "simulate Gamma(%s, %s) by Accept-reject via Gamma(%s,%s)"%(alpha, beta, a, b)
+		import rpy, pylab, math, random
+		sample_list = []
+		sample_mean_list = []
+		x_with_max_ratio = (alpha-a)/(beta-b)
+		M = rpy.r.dgamma(x_with_max_ratio, a, b)/rpy.r.dgamma(x_with_max_ratio, alpha, beta)
+		for i in range(no_of_samples):
+			gamma_sample = rpy.r.rgamma(1, a, b)
+			u = random.random()
+			if u<= rpy.r.dgamma(gamma_sample, alpha, beta)/(M*rpy.r.dgamma(gamma_sample, a, b)):
+				if sample_list:
+					old_no_of_samples = len(sample_list)
+					new_mean = (sample_mean_list[-1]*old_no_of_samples+gamma_sample)/(old_no_of_samples+1)
+					sample_mean_list.append(new_mean)
+				else:
+					sample_mean_list.append(gamma_sample)
+				sample_list.append(gamma_sample)
+		accept_ratio = len(sample_list)/float(no_of_samples)
+		self.output_and_plot(accept_ratio, sample_list, alpha, beta, a, b, sample_mean_list)
+	
+	def test_metropolis_hastings(self, no_of_samples=10000, alpha=4.3, beta=6.2, a=4, b=6):
+		"""
+		2007-01-23
+			Gamma(4,7) and Gamma(5,6) also work with lower(70%, 76%) accept_ratio. Gamma(4,6) is 94.6%
+			
+			Generally, Metropolis-Hastings is better than Accept-Reject. the estimate is more accurate
+			and it could use more candidate distributions.
+		"""
+		print "simulate Gamma(%s, %s) by Metropolis-Hastings via Gamma(%s,%s)"%(alpha, beta, a, b)
+		import rpy, pylab, math, random
+		u = random.random()
+		sample_mean_list = [u]
+		sample_list = [u]
+		no_of_accepts = 0
+		for i in range(no_of_samples):
+			old_gamma_sample = sample_list[i]
+			gamma_sample = rpy.r.rgamma(1, a, b)
+			ro = pow(gamma_sample/old_gamma_sample, alpha-a)*math.exp(-(beta-b)*(gamma_sample-old_gamma_sample))
+			ro = min(ro, 1)
+			u = random.random()
+			if u<=ro:
+				no_of_accepts += 1
+			else:	#reject
+				gamma_sample = old_gamma_sample
+			
+			old_no_of_samples = len(sample_mean_list)
+			new_mean = (sample_mean_list[-1]*old_no_of_samples+gamma_sample)/(old_no_of_samples+1)
+			sample_mean_list.append(new_mean)
+			
+			sample_list.append(gamma_sample)
+		
+		accept_ratio = no_of_accepts/float(no_of_samples)
+		self.output_and_plot(accept_ratio, sample_list, alpha, beta, a, b, sample_mean_list)
+
 if __name__ == '__main__':
 	if len(sys.argv) == 1:
 		print __doc__
@@ -322,7 +407,8 @@ if __name__ == '__main__':
 		3:Problem3_3,
 		4:Problem3_15,
 		5: Problem5_1 ,
-		6: Problem5_5}
+		6: Problem5_5,
+		7: Problem7_1}
 	type = 0
 	for opt, arg in opts:
 		if opt in ("-h", "--help"):
