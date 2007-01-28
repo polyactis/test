@@ -1,9 +1,11 @@
 #> source("c:/WorkTransfer/CDCcourse/Labs/MHLogistic.txt",print.eval=TRUE)#
 #This analyzes the health policy data#
-logdata<-read.table("c:/WorkTransfer/CDCcourse/Labs/LogisticData.txt",header=T)
+logdata<-read.table("LogisticData.txt",header=T)
 np<-logdata[,2];met<-logdata[,3];erodd<-logdata[,5]
 #Get MLEs, set up densities#
-#summary(glm(erodd~met+np, family=binomial(link=logit)))
+summary(glm(erodd~met+np, family=binomial(link=logit)))
+#2007-01-27 Yu Huang all probability functions are logged.
+
 loglike <- function(a,b,c)sum(erodd*(a+b*met+c*np)-log(1+exp(a+b*met+c*np)))
 am<--1.97392;as<- 0.22109;
 bm<- 0.28438;bs<-0.09270;
