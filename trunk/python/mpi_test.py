@@ -1,9 +1,41 @@
 #!/usr/bin/env mpipython
+#2007-01-20 test the problem incurred by rpy under parallel environment
+import sys, os, math
+bit_number = math.log(sys.maxint)/math.log(2)
+if bit_number>40:       #64bit
+	sys.path.insert(0, os.path.expanduser('~/lib64/python'))
+	sys.path.insert(0, os.path.join(os.path.expanduser('~/script64/annot/bin')))
+	binary_path = os.path.expanduser('~/script64/haifeng_annot/bin')
+else:   #32bit
+	sys.path.insert(0, os.path.expanduser('~/lib/python'))
+	sys.path.insert(0, os.path.join(os.path.expanduser('~/script/annot/bin')))
+	binary_path = os.path.expanduser('~/script/haifeng_annot/bin')
+import getopt, csv, cPickle, re
+from Scientific import MPI
+from codense.common import system_call, mpi_synchronize, output_node, input_node,\
+	computing_node
+import Numeric as numpy
+from sets import Set
+
+hostname = os.popen('hostname').read().strip()
+if hostname in ['soma-desktop', 'dl403k-1']:
+	import rpy_options
+	rpy_options.rpy_options['RHOME']='/usr/lib/R'
+	if hostname=='soma-desktop':
+		rpy_options.rpy_options['RVERSION']='2.3.1'
+	elif hostname=='dl403k-1':
+		rpy_options.rpy_options['RVERSION']='2.4.0'
+from rpy import r
+if sys.version_info[:2] < (2, 3):       #python2.2 or lower needs some extra
+        from python2_3 import *
+
+
 from Scientific import MPI
 import sys, cPickle	#10-15-05 cPickle is used to serialize objects
 from Numeric import Float, array, Int, zeros
 
 communicator = MPI.world.duplicate()
+sys.stdout.write("Re rank: %s, hostname: %s\n"%(communicator.rank, hostname))
 
 print "I'm %s of %s"%(communicator.rank, communicator.size)
 
