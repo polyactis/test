@@ -5370,15 +5370,15 @@ def convert_prediction_data_to_R(input_fname, output_fname):
 	for row in reader:
 		pattern_id, unknown_percentage, no_of_vertices, no_of_edges, avg_degree, density, supports, vertex_id, \
 			is_known, unknown_neighbor_perc, degree, no_of_neighbors = row[:12]
-		no_of_gos = len(row[12:])/3
-		go_binary_list = row[12:12+no_of_gos*1]
-		m1_list = row[12+no_of_gos*1:12+no_of_gos*2]
-		p_value_list =row[12+no_of_gos*2:12+no_of_gos*3]
+		no_of_gos = len(row[12:])/3	#guess the number of function categories
+		go_binary_list = row[12:12+no_of_gos*1]	#a binary list for this gene versus all function categories, 1 means yes, 0 means no.
+		m1_list = row[12+no_of_gos*1:12+no_of_gos*2]	#the score list for all function categories
+		p_value_list =row[12+no_of_gos*2:12+no_of_gos*3]	#the p-value list for all function categories
 		m1_list = map(float, m1_list)
 		p_value_list = map(float, p_value_list)
-		go_index_with_max_m1_score = numarray.argmax(m1_list)
-		p_value = p_value_list[go_index_with_max_m1_score]
-		is_correct = int(go_binary_list[go_index_with_max_m1_score])
+		go_index_with_max_m1_score = numarray.argmax(m1_list)	#the index of the function category with maximum score
+		p_value = p_value_list[go_index_with_max_m1_score]	#corresponding p-value
+		is_correct = int(go_binary_list[go_index_with_max_m1_score])	#whether this gene belongs to the function category
 		row = [int(supports), int(no_of_vertices), float(density), m1_list[go_index_with_max_m1_score], p_value]
 		writer.writerow(row)
 		counter += 1
@@ -5576,6 +5576,8 @@ def draw_two_color_histogram(data, label, output_fname):
 	"""
 	2006-10-31
 		add a histogram for the 3rd entry of data if present
+	2007-01-08
+		in data, index 0 is wrong (blue) , index 1 is correct (red), index -1 is unknown (green)
 	"""
 	sys.stderr.write("Drawing histogram %s ..."%label)
 	import matplotlib; matplotlib.use("Agg")
@@ -5584,9 +5586,9 @@ def draw_two_color_histogram(data, label, output_fname):
 	pylab.xlabel(label)
 	pylab.hist(data[0], 100, normed=1, alpha=0.4)
 	pylab.hist(data[1], 100, normed=1, alpha=0.4, facecolor='r', edgecolor='r')
-	if len(data)==3	#2006-10-31
+	if len(data)==3:	#2006-10-31
 		if len(data[2])>5:
-		pylab.hist(data[2], 100, normed=1, alpha=0.4, facecolor='g', edgecolor='g')
+			pylab.hist(data[2], 100, normed=1, alpha=0.4, facecolor='g', edgecolor='g')
 	pylab.savefig(output_fname)
 	pylab.clf()
 	sys.stderr.write("done.\n")
@@ -5798,6 +5800,366 @@ def cal_pattern_prot_int_perc(curs, good_cluster_table, aug_pi_table, output_fna
 	return pi_perc_mcl_id_ls
 
 
+"""
+2007-01-02
+
+	example commandline:
+		
+		catch_overlapping_high_hits('./tmp/good_cl_hs_fim_65_n2s175_m5x65s4l5_ft2_e5_000001a60.hiv_int.hg.p_value', './tmp/good_cl_hs_fim_65_n2s175_m5x65s4l5_ft2_e5_000001a60.prot_int.hg.p_value', './tmp/gene_condition_vertex_set.hs_fim_65_n2s175_m5x65s4l5_ft2.cmp', cmp_condition_column_to_be_sorted=7, cmp_condition_column_reverse_sort=0, hiv_top_number=40)
+"""
+def get_top_list_from_fname(input_fname, top_number, column_to_be_captured_list=[1], column_to_be_sorted=None, reverse_sort=0):
+	import csv
+	from sets import Set
+	reader = csv.reader(open(input_fname), delimiter='\t')
+	i = 0
+	top_list = []
+	for row in reader:
+		if column_to_be_sorted:
+			for column_to_be_captured in column_to_be_captured_list:
+				top_list.append((float(row[column_to_be_sorted]), int(row[column_to_be_captured])))
+			#no increase of i
+		else:
+			for column_to_be_captured in column_to_be_captured_list:
+				top_list.append(int(row[column_to_be_captured]))
+			i += 1
+			if i==top_number:
+				break
+	if column_to_be_sorted:
+		top_list = list(Set(top_list))	#unique by Set() and then recast to list
+		top_list.sort()
+		if reverse_sort:
+			top_list.reverse()
+		top_list = top_list[:top_number]
+		top_list = [row[1] for row in top_list]
+	return top_list
+
+def catch_overlapping_high_hits(hiv_p_value_fname, prot_int_p_value_fname, cmp_condition_fname, hiv_top_number=20, \
+	prot_int_top_number=60, cmp_condition_top_number=40, cmp_condition_column_to_be_sorted=6, cmp_condition_column_reverse_sort=1):
+	import csv
+	from sets import Set
+	hiv_top_list = get_top_list_from_fname(hiv_p_value_fname, hiv_top_number)
+	prot_int_top_list = get_top_list_from_fname(prot_int_p_value_fname, prot_int_top_number)
+	#get the cmp_condition_top_list
+	cmp_condition_top_list = get_top_list_from_fname(cmp_condition_fname, cmp_condition_top_number, \
+		column_to_be_captured_list=[1,3], column_to_be_sorted=cmp_condition_column_to_be_sorted, reverse_sort=cmp_condition_column_reverse_sort)
+	print "hiv(%s) and cmp_condition(%s)"%(hiv_top_number, cmp_condition_top_number)
+	print Set(hiv_top_list)&Set(cmp_condition_top_list)
+	print "protein interaction(%s) and cmp_condition(%s)"%(prot_int_top_number, cmp_condition_top_number)
+	print Set(prot_int_top_list)&Set(cmp_condition_top_list)
+	print "hiv(%s) and protein interaction(%s)"%(hiv_top_number, prot_int_top_number)
+	print Set(hiv_top_list)&Set(prot_int_top_list)
+	
+"""
+2007-01-03
+"""
+def catch_hiv_sentences_given_gene_list(hiv_interaction_fname, gene_list):
+	import csv
+	from sets import Set
+	gene_set = Set(gene_list)
+	reader = csv.reader(open(hiv_interaction_fname), delimiter='\t')
+	for row in reader:
+		tax_id1, gene_id1, acc_ver1, product_name1, interaction_phrase, tax_id2, \
+			gene_id2, acc_ver2, product_name2, pmid_list, update_timestamp, generif_text = row
+		tax_id1 = int(tax_id1)
+		tax_id2 = int(tax_id2)
+		gene_id2 = int(gene_id2)
+		if gene_id2 in  gene_set:
+			print row
+	del reader
+
+
+"""
+2007-01-13
+	to get genes newly assigned with GO terms 
+"""
+def output_GO_newly_assigned_genes(curs, output_fname, gene_id2gene_symbol, old_go_table='gene.gene2go', new_go_table='gene.gene2go_2006_12_19'):
+	from sets import Set
+	#get the old assigned
+	sys.stderr.write('Getting the old assigned...')
+	curs.execute("SELECT distinct g.gene_id from %s g, go.term t where t.term_type='biological_process'\
+		and t.acc=g.go_id and g.go_id!='GO:0000004' and t.is_obsolete=0 and g.tax_id=9606"%(old_go_table))
+	old_assigned_gene_set = Set()
+	rows = curs.fetchall()
+	for row in rows:
+		old_assigned_gene_set.add(int(row[0]))
+	sys.stderr.write("Done.\n")
+	
+	sys.stderr.write('Getting the newly assigned...')
+	#get the newly assigned
+	curs.execute("SELECT distinct g.gene_id from %s g where g.category='Process'\
+		and g.go_id!='GO:0000004' and g.tax_id=9606"%(new_go_table))
+	newly_assigned_gene_list = []
+	rows = curs.fetchall()
+	for row in rows:
+		gene_id = int(row[0])
+		if gene_id not in old_assigned_gene_set:
+			if gene_id in gene_id2gene_symbol:
+				newly_assigned_gene_list.append(gene_id2gene_symbol[gene_id])
+	newly_assigned_gene_list.sort()
+	sys.stderr.write("Done.\n")
+	
+	sys.stderr.write('Outputting...')
+	#output
+	outf = open(output_fname, 'w')
+	for gene_id in newly_assigned_gene_list:
+		outf.write('%s\n'%gene_id)
+	del outf
+	sys.stderr.write("Done.\n")
+
+
+"""
+2007-01-16
+	make a TF-association file in the same format as output of haifeng_annot/7-go/go_informative_node.py
+	
+	gene_fname is the file containing all gene id's, like the file used for go_informative_node.py
+	Example calling:
+		construct_gene_id2tf_matrix(curs, 'hs_fim_65', '/tmp/human.gene', '/tmp/hs_fim_65.tf')
+"""
+def construct_gene_id2tf_matrix(curs, schema, gene_fname, output_fname):
+	import csv, sys, os
+	from sets import Set
+	sys.stderr.write('Getting gene_id_set...')
+	reader = csv.reader(open(gene_fname), delimiter='\t')
+	gene_id_set = Set()
+	for row in reader:
+		gene_id = int(row[0])
+		gene_id_set.add(gene_id)
+	sys.stderr.write("Done.\n")
+	
+	sys.stderr.write('Creating gene_id2mt_no_list...')
+	gene_id2mt_no_list = {}
+	curs.execute("select gene_id, trans_fac from %s.gene where trans_fac is not null"%schema)
+	rows = curs.fetchall()
+	mt_no_set = Set()
+	for row in rows:
+		gene_id, trans_fac = row
+		gene_id = int(gene_id)
+		if gene_id in gene_id_set:
+			trans_fac = trans_fac[1:-1].split(',')
+			trans_fac = map(int, trans_fac)
+			gene_id2mt_no_list[gene_id] = trans_fac
+			for mt_no in trans_fac:
+				mt_no_set.add(mt_no)
+	sys.stderr.write("Done.\n")
+	
+	#get the mt_no2column_index
+	sys.stderr.write("Creating mt_no2column_index...")
+	sys.path.insert(0, os.path.join(os.path.expanduser('~/script/annot/bin')))
+	from codense.common import get_gene_id2gene_symbol
+	gene_id2gene_symbol = get_gene_id2gene_symbol(curs, 9606)
+	mt_no_list = list(mt_no_set)
+	mt_no_list.sort()
+	mt_no2column_index = {}
+	mt_name_list = []
+	for i in range(len(mt_no_list)):
+		mt_no2column_index[mt_no_list[i]] = i
+		mt_name_list.append('%s(%s)'%(mt_no_list[i], gene_id2gene_symbol[mt_no_list[i]]))
+	
+	writer = csv.writer(open(output_fname, 'w'), delimiter='\t')
+	mt_name_list.insert(0, '')
+	mt_name_list.insert(0, '')
+	writer.writerow(mt_name_list)
+	sys.stderr.write("Done.\n")
+	
+	sys.stderr.write("Outputting...")
+	for gene_id in gene_id2mt_no_list:
+		mt_no_incidence_list = [0]*len(mt_no2column_index)
+		for mt_no in gene_id2mt_no_list[gene_id]:
+			mt_no_incidence_list[mt_no2column_index[mt_no]] = 1
+		writer.writerow([gene_id, 1]+mt_no_incidence_list)
+	
+	for gene_id in gene_id_set:
+		if gene_id not in gene_id2mt_no_list:
+			writer.writerow([gene_id, 0] + [0]*len(mt_no2column_index))
+	del writer
+	sys.stderr.write("Done.\n")
+
+def Extract_high_p_value_hits(info_matrix_fname, input_p_value_fname, output_fname, p_value_cut_off=0.01, curs=None):
+	"""
+	2007-01-22
+		output in Darwin format
+		
+	"""
+	if curs:
+		from codense.common import get_go_id2name
+		go_id2name = get_go_id2name(curs)
+	else:
+		go_id2name = None
+	
+	import csv, sys
+	sys.stderr.write("Making index2name ...")
+	reader = csv.reader(open(info_matrix_fname), delimiter='\t')
+	header_row = reader.next()[2:]
+	for i in range(len(header_row)):
+		if go_id2name:
+			header_row[i] = go_id2name[header_row[i]]
+		else:
+			gene_id_name = header_row[i]
+			gene_id_name = gene_id_name[:-1].replace('(', '_')
+			header_row[i] = gene_id_name
+	del reader
+	sys.stderr.write("Done.\n")
+	
+	sys.stderr.write("Extracting high p-value hits ...\n")
+	reader = csv.reader(open(input_p_value_fname), delimiter='\t')
+	outf = open(output_fname, 'w')
+	outf.write('r:=[\n')
+	counter = 0
+	real_counter = 0
+	pattern_id2properties = {}
+	from sets import Set
+	pattern_id_set = Set()
+	for row in reader:
+		pattern_id, unknown_percentage, no_of_vertices, no_of_edges, avg_degree, density, supports, vertex_id, \
+			is_known, unknown_neighbor_perc, degree, no_of_neighbors = row[:12]
+		pattern_id = int(pattern_id)
+		if pattern_id not in pattern_id_set:	#p-value is not leave-one-out, to avoid redundancy
+			pattern_id_set.add(pattern_id)
+			
+			no_of_gos = len(row[12:])/3
+			go_binary_list = row[12:12+no_of_gos*1]
+			m1_list = row[12+no_of_gos*1:12+no_of_gos*2]
+			p_value_list =row[12+no_of_gos*2:12+no_of_gos*3]
+			
+			p_value_list = map(float, p_value_list)
+			high_hits_list = []
+			for i in range(len(p_value_list)):
+				if float(p_value_list[i])<=p_value_cut_off:
+					high_hits_list.append("['%s', %s]"%(header_row[i], p_value_list[i]))
+			if len(high_hits_list)>0:
+				outf.write('[%s, [%s]],\n'%(pattern_id, ','.join(high_hits_list)))
+				real_counter += 1
+			
+			counter += 1
+			if counter%5000==0:
+				sys.stderr.write("%s%s\t%s"%('\x08'*20, counter, real_counter))
+	sys.stderr.write("%s%s\t%s"%('\x08'*20, counter, real_counter))
+	outf.write('[]]:\n')
+	del reader, outf
+	sys.stderr.write("Done.\n")
+
+def get_pattern_recurrence(pattern_fname):
+	
+	"""
+	2007-01-23
+		
+	"""
+	import sys, csv
+	sys.stderr.write("Getting recurrence for all patterns...\n")
+	reader = csv.reader(open(pattern_fname), delimiter='\t')
+	pattern_id2recurrence = {}
+	pattern_id2size = {}
+	frequent_pattern_counter_ls = []
+	
+	#the lambda function to cut off recurrence
+	cut_off_func = lambda x: int(float(x)>=0.8)
+	#need the first row to determine the number of total datasets
+	row = reader.next()
+	vertex_set, edge_set, recurrence_array = row
+	pattern_size = len(vertex_set[1:-1].split(','))
+	recurrence_array = recurrence_array[1:-1].split(',')
+	recurrence_array = map(cut_off_func, recurrence_array)
+	recurrence = sum(recurrence_array)
+	
+	for i in range(len(recurrence_array)):
+		frequent_pattern_counter_ls.append(0.0)
+	
+	frequent_pattern_counter_ls[recurrence-1] += 1
+	pattern_id = 1
+	pattern_id2recurrence[pattern_id] = recurrence
+	pattern_id2size[pattern_id] = pattern_size
+	
+	for row in reader:
+		vertex_set, edge_set, recurrence_array = row
+		recurrence_array = recurrence_array[1:-1].split(',')
+		recurrence_array = map(cut_off_func, recurrence_array)
+		recurrence = sum(recurrence_array)
+		frequent_pattern_counter_ls[recurrence-1] += 1
+		pattern_id += 1
+		pattern_id2recurrence[pattern_id] = recurrence
+		pattern_size = len(vertex_set[1:-1].split(','))
+		pattern_id2size[pattern_id] = pattern_size
+		if pattern_id%5000==0:
+			sys.stderr.write("%s%s"%('\x08'*20, pattern_id))
+	del reader
+	sys.stderr.write("%s%s\n"%('\x08'*20, pattern_id))
+	sys.stderr.write("Done.\n")
+	return pattern_id2recurrence, pattern_id2size, frequent_pattern_counter_ls
+
+def draw_func_homo_curve(no_of_datasets, pattern_id2recurrence, pattern_id2size, top_hits_fname, size_interesting=6):
+	"""
+	2007-01-24
+	
+	"""
+	import sys
+	sys.stderr.write("Counting homogeneous patterns given each recurrence...\n")
+	frequent_pattern_counter_ls = []
+	frequent_homo_pattern_counter_ls = []
+	for i in range(no_of_datasets):
+		frequent_pattern_counter_ls.append(0.0)
+		frequent_homo_pattern_counter_ls.append(0.0)
+	for pattern_id, recurrence in pattern_id2recurrence.iteritems():
+		if pattern_id2size[pattern_id] == size_interesting:
+			frequent_pattern_counter_ls[recurrence-1] += 1
+	inf = open(top_hits_fname)
+	inf.readline()	#discard the 1st line
+	counter = 0 
+	for line in inf:
+		if line[1]!=']':
+			pattern_id = line[1:].split(',')[0]
+			pattern_id = int(pattern_id)
+			recurrence = pattern_id2recurrence[pattern_id]
+			size = pattern_id2size[pattern_id]
+			if size==size_interesting:
+				frequent_homo_pattern_counter_ls[recurrence-1] += 1
+			counter+=1
+			if counter%5000==0:
+				sys.stderr.write("%s%s"%('\x08'*20, counter))
+	del inf
+	sys.stderr.write("%s%s\n"%('\x08'*20, counter))
+	sys.stderr.write("Done.\n")
+	
+	sys.stderr.write("Drawing the curve...")
+	import pylab
+	recurrence_ls = []
+	homo_perc_ls = []
+	for i in range(len(frequent_pattern_counter_ls)):
+		if frequent_pattern_counter_ls[i]>0:
+			recurrence_ls.append(i+1)
+			homo_perc_ls.append(frequent_homo_pattern_counter_ls[i]/frequent_pattern_counter_ls[i])
+	pylab.plot(recurrence_ls, homo_perc_ls, 'ro-')
+	pylab.show()
+	sys.stderr.write("Done.\n")
+	return recurrence_ls, homo_perc_ls, frequent_pattern_counter_ls, frequent_homo_pattern_counter_ls
+
+"""
+2007-01-27
+	into 5 columns, gene_no, go_index, score, unknown_neighbor_perc, is_correct
+"""
+def convert_prediction_data(input_fname, output_fname):
+	import csv, sys
+	reader = csv.reader(open(input_fname), delimiter='\t')
+	writer = csv.writer(open(output_fname, 'w'), delimiter='\t')
+	counter = 0
+	header_row = ['gene_no', 'go_index', 'm1_score', 'unknown_neighbor_perc', 'is_correct']
+	writer.writerow(header_row)
+	for row in reader:
+		pattern_id, unknown_percentage, no_of_vertices, no_of_edges, avg_degree, density, supports, vertex_id, \
+			is_known, unknown_neighbor_perc, degree, no_of_neighbors = row[:12]
+		no_of_gos = len(row[12:])/3	#guess the number of function categories
+		go_binary_list = row[12:12+no_of_gos*1]	#a binary list for this gene versus all function categories, 1 means yes, 0 means no.
+		m1_list = row[12+no_of_gos*1:12+no_of_gos*2]	#the score list for all function categories
+		p_value_list =row[12+no_of_gos*2:12+no_of_gos*3]	#the p-value list for all function categories
+		for i in range(no_of_gos):
+			new_row = [vertex_id, i+1, m1_list[i], unknown_neighbor_perc, go_binary_list[i]]
+			writer.writerow(new_row)
+		counter += 1
+		if counter%5000==0:
+			sys.stderr.write("%s%s"%('\x08'*20, counter))
+	sys.stderr.write("%s%s\n"%('\x08'*20, counter))
+	del reader, writer
+
+
 #01-03-06 for easy console
 import sys, os, math
 bit_number = math.log(sys.maxint)/math.log(2)
@@ -5822,7 +6184,7 @@ if __name__ == '__main__':
 	hostname='zhoudb'
 	dbname='graphdb'
 	conn, curs = db_connect(hostname, dbname)
-	masked_prom_seq2db(curs, '/home/cmb-01/yuhuang/transfac/prom_seq_mm_masked', 'transfac.prom_seq', need_commit = 1)
+	#masked_prom_seq2db(curs, '/home/cmb-01/yuhuang/transfac/prom_seq_mm_masked', 'transfac.prom_seq', need_commit = 1)
 	
 	#### following codes find patterns given go_no_list
 	"""

@@ -1,5 +1,6 @@
 #!/usr/bin/env mpipython
 #2007-01-20 test the problem incurred by rpy under parallel environment
+#basically, the popen() or stderr causes the communication 
 import sys, os, math
 bit_number = math.log(sys.maxint)/math.log(2)
 if bit_number>40:       #64bit
