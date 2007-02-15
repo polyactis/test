@@ -6141,7 +6141,7 @@ def convert_prediction_data(input_fname, output_fname):
 	reader = csv.reader(open(input_fname), delimiter='\t')
 	writer = csv.writer(open(output_fname, 'w'), delimiter='\t')
 	counter = 0
-	header_row = ['gene_no', 'go_index', 'm1_score', 'unknown_neighbor_perc', 'is_correct']
+	header_row = ['gene_no', 'go_index', 'm1_score', 'unknown_neighbor_perc', 'is_correct', 'is_known']
 	writer.writerow(header_row)
 	for row in reader:
 		pattern_id, unknown_percentage, no_of_vertices, no_of_edges, avg_degree, density, supports, vertex_id, \
@@ -6151,13 +6151,59 @@ def convert_prediction_data(input_fname, output_fname):
 		m1_list = row[12+no_of_gos*1:12+no_of_gos*2]	#the score list for all function categories
 		p_value_list =row[12+no_of_gos*2:12+no_of_gos*3]	#the p-value list for all function categories
 		for i in range(no_of_gos):
-			new_row = [vertex_id, i+1, m1_list[i], unknown_neighbor_perc, go_binary_list[i]]
+			new_row = [vertex_id, i+1, m1_list[i], unknown_neighbor_perc, go_binary_list[i], is_known]
 			writer.writerow(new_row)
 		counter += 1
 		if counter%5000==0:
 			sys.stderr.write("%s%s"%('\x08'*20, counter))
 	sys.stderr.write("%s%s\n"%('\x08'*20, counter))
 	del reader, writer
+
+def count_haifeng_prediction_coverage(curs, info_matrix_fname, haifeng_pred_fname):
+	"""
+	2007-01-29
+		
+	"""
+	import csv, sys
+	from sets import Set
+	sys.stderr.write("Starting...")
+	gene_id_set = Set()
+	pred_reader = csv.reader(open(haifeng_pred_fname), delimiter=' ')
+	counter = 0.0
+	go_index2count = {}
+	for row in pred_reader:
+		row = map(int, row[:2])
+		gene_id, go_index = row[:2]
+		go_index -= 1
+		if go_index not in go_index2count:
+			go_index2count[go_index] = 0
+		go_index2count[go_index] += 1
+		gene_id_set.add(gene_id)
+		counter += 1
+	del pred_reader
+	sys.stderr.write("Done.\n")
+	
+	sys.stderr.write("Making index2name ...")
+	reader = csv.reader(open(info_matrix_fname), delimiter='\t')
+	header_row = reader.next()[2:]
+	counter_all_go = 0.0
+	for row in reader:
+		gene_id=int(row[0])
+		if gene_id in gene_id_set:
+			go_binary_list = row[2:]
+			go_binary_list = map(int, go_binary_list)
+			counter_all_go += sum(go_binary_list)
+	del reader
+	sys.stderr.write("Done.\n")
+	if counter_all_go>0:
+		print "coverage: %s"%(counter/counter_all_go)
+	
+	from codense.common import get_go_id2name
+	go_id2name = get_go_id2name(curs)
+	
+	for go_index, count in go_index2count.iteritems():
+		go_id = header_row[go_index]
+		print "%s\t%s(%s)\t%s"%(count, go_id, go_id2name[go_id], count/counter)
 
 
 #01-03-06 for easy console
@@ -6184,6 +6230,8 @@ if __name__ == '__main__':
 	hostname='zhoudb'
 	dbname='graphdb'
 	conn, curs = db_connect(hostname, dbname)
+	count_haifeng_prediction_coverage(curs, '/tmp/hs_fim_65_n2s175.go', '/tmp/unknown.pred')
+	
 	#masked_prom_seq2db(curs, '/home/cmb-01/yuhuang/transfac/prom_seq_mm_masked', 'transfac.prom_seq', need_commit = 1)
 	
 	#### following codes find patterns given go_no_list
