@@ -18,8 +18,7 @@ Examples:
 5: Problem5_1
 6: Problem5_5
 7: Problem7_1
-8: Math508_HW2_1
-9: Math508_HW2_2
+8: Problem8_5
 """
 import sys, os, math
 bit_number = math.log(sys.maxint)/math.log(2)
@@ -392,128 +391,41 @@ class Problem7_1(unittest.TestCase):
 		accept_ratio = no_of_accepts/float(no_of_samples)
 		self.output_and_plot(accept_ratio, sample_list, alpha, beta, a, b, sample_mean_list)
 
-class Math508_HW2_1(unittest.TestCase):
+class Problem8_5(unittest.TestCase):
 	"""
-	2007-01-26
-		Homework 2, No 1 of Math508 (Filtering Theory)
-	"""
-	def setUp(self):
-		print
+	2007-01-28
 	
-	def plot_trace(self, trace_list, N, title):
-		import pylab
-		pylab.clf()
-		x_list = []
-		y_list = []
-		for row in trace_list:
-			x_list.append(row[0])
-			y_list.append(row[1])
-		pylab.plot(x_list, y_list, '-')
-		pylab.title(title)
-		pylab.show()
-	
-	def vector_plus(self, vector1, vector2):
-		vector3 = []
-		for i in range(len(vector1)):
-			vector3.append(vector1[i] + vector2[i])
-		return vector3
-	
-	def test_hw2_1_a(self):
-		import random
-		N = raw_input("Please specify N (#iterations):")
-		if N:
-			N = int(N)
-		else:
-			N = 100
-		trace_list = [[0,0]]
-		i = 0
-		while i<N:
-			u = random.random()
-			if u>=0 and u<0.25:
-				step = [1, 0]
-			elif u>=0.25 and u<0.5:
-				step = [-1, 0]
-			elif u>=0.5 and u<0.75:
-				step = [0, 1]
-			else:
-				step = [0, -1]
-			trace_list.append(self.vector_plus(trace_list[-1], step))
-			i += 1
-		self.plot_trace(trace_list, N, "HW2-1-a, simple r.w. on Z^2. N=%s"%(N))
-	
-	def test_hw2_1_b(self):
-		import random
-		N = raw_input("Please specify N (#iterations):")
-		if N:
-			N = int(N)
-		else:
-			N = 100
-		trace_list = [[0,0]]
-		i = 0
-		while i<N:
-			u = random.random()
-			if u>=0 and u<0.2:
-				step = [1, 0]
-			elif u>=0.2 and u<0.5:
-				step = [-1, 0]
-			elif u>=0.5 and u<0.75:
-				step = [0, 1]
-			else:
-				step = [0, -1]
-			trace_list.append(self.vector_plus(trace_list[-1], step))
-			i += 1
-		self.plot_trace(trace_list, N, "HW2-1-b, non-simple r.w. on Z^2. N=%s"%(N))
-
-class Math508_HW2_2(unittest.TestCase):
-	"""
-	2007-01-26
-		Homework 2, No 2 of Math508 (Filtering Theory)
+	Robert & Casella 2004, slice sampling of N(0,1)
 	"""
 	def setUp(self):
 		print
 	
-	def plot_TL_list(self, TL_list, title):
-		import pylab
-		pylab.clf()
-		x_list = range(1, len(TL_list)+1)
-		pylab.plot(x_list, TL_list, 'o')
-		pylab.title(title)
-		pylab.show()
-		pylab.clf()
-		pylab.hist(TL_list, 100)
-		pylab.show()
-	
-	def test_hw2_2(self):
-		import random
-		m = raw_input("Please specify m (#trajectories):")
-		if m:
-			m = int(m)
+	def test_slice_sampling(self):
+		"""
+		2007-01-28
+		"""
+		print "slice sampling of N(0,1)"
+		N = raw_input("Please specify N (#iterations):")
+		if N:
+			N = int(N)
 		else:
-			m = 20
-		L = raw_input("Please specify L (maximum length of trajectory):")
-		if L:
-			L = int(L)
-		else:
-			L = 100
-		TL_list = []
+			N = 1000
+		import rpy, pylab, math, random
+		sample_list = [0]	#the starting x is 0
 		i = 0
-		while i<m:
-			X = 0
-			j = 0
-			while j<L:
-				u = random.random()
-				if u>=0 and u<0.5:
-					step = 1
-				else:
-					step = -1
-				X += step
-				if X==0:
-					break
-				j+=1
-			TL_list.append(j+1)
+		while i<N:
+			u = random.uniform(0, math.exp(-sample_list[-1]*sample_list[-1]/2))
+			uniform_range = math.sqrt(-2*math.log(u))
+			new_x = random.uniform(-uniform_range, uniform_range)
+			sample_list.append(new_x)
 			i+=1
-		self.plot_TL_list(TL_list, "HW2-2, T_L=min{T, L} of simple r.w. on Z. m=%s, L=%s"%(m, L))
-		
+		Fn = rpy.r.ecdf(sample_list)
+		x_value_list = [0, 0.67, 0.84, 1.28, 1.64, 1.96, 2.33, 2.58, 3.09, 3.72]
+		print "By %s iterations of slice sampling"%(N)
+		print "%s\t%s\t%s"%("x", "empirical cdf", "rpy.r.pnorm")
+		for x in x_value_list:
+			print "%s\t%s\t%s"%(x, Fn(x), rpy.r.pnorm(x))
+
 if __name__ == '__main__':
 	if len(sys.argv) == 1:
 		print __doc__
@@ -533,8 +445,7 @@ if __name__ == '__main__':
 		5: Problem5_1 ,
 		6: Problem5_5,
 		7: Problem7_1,
-		8: Math508_HW2_1,
-		9: Math508_HW2_2}
+		8: Problem8_5}
 	type = 0
 	for opt, arg in opts:
 		if opt in ("-h", "--help"):
