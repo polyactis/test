@@ -19,6 +19,7 @@ Examples:
 6: Problem5_5
 7: Problem7_1
 8: Problem8_5
+9: Problem9_2
 """
 import sys, os, math
 bit_number = math.log(sys.maxint)/math.log(2)
@@ -426,6 +427,71 @@ class Problem8_5(unittest.TestCase):
 		for x in x_value_list:
 			print "%s\t%s\t%s"%(x, Fn(x), rpy.r.pnorm(x))
 
+class Problem9_2(unittest.TestCase):
+	"""
+	2007-02-21
+	"""
+	def setUp(self):
+		print
+	
+	def plot_X_sq_Y_sq_list(self, sample_list):
+		X_sq_Y_sq_list = []
+		for x,y in sample_list:
+			X_sq_Y_sq_list.append(x*x+y*y)
+		import rpy
+		rpy.r.hist(X_sq_Y_sq_list, probability=rpy.r.TRUE, main='histogram of X^2+Y^2', xlab='X^2+Y^2', ylab='frequency')
+		rpy.r.lines(rpy.r.density(X_sq_Y_sq_list), col=2)
+		cont = raw_input("Continue:?")
+		Fn = rpy.r.ecdf(X_sq_Y_sq_list)
+		rpy.r.plot(Fn, main='ecdf')
+		print "P(X^2+Y^2>2)=%s"%Fn(2)
+		cont = raw_input("Continue:?")
+	
+	def plot_X_Y_density(self, sample_list):
+		import rpy, pylab
+		rpy.r.library('MASS')
+		x_list = [row[0] for row in sample_list]
+		y_list = [row[1] for row in sample_list]
+		f1 = rpy.r.kde2d(x_list, y_list, lims=[-1,1,-1,1])
+		im = pylab.imshow(f1['z'], interpolation='bilinear')
+		pylab.contour(f1['z'])
+		pylab.title("Bivariate normal density plot")
+		pylab.axis('off')
+		#pylab.hot()
+		pylab.colorbar()
+		pylab.show()
+	
+	def test_2_stage_gibbs_sampling(self):
+		"""
+		2007-02-21
+		"""
+		print "2-stage gibbs sampling of N([0,0], [[1, \rou], [\rou, 1]])"
+		N = raw_input("Please specify N (#iterations, default=1000):")
+		if N:
+			N = int(N)
+		else:
+			N = 1000
+		rou = raw_input("Please specify rou (correlatoin, default=0.3):")
+		if rou:
+			rou = float(rou)
+		else:
+			rou = 0.3
+		import pylab, math, random
+		sample_list = []
+		i = 0
+		y = 0	#the initial y
+		variance = 1- rou*rou
+		while i<N:
+			x = random.gauss(rou*y, variance)
+			y = random.gauss(rou*x, variance)
+			sample_list.append([x,y])
+			i+=1
+		
+		self.plot_X_sq_Y_sq_list(sample_list)
+		self.plot_X_Y_density(sample_list)
+		
+		
+
 if __name__ == '__main__':
 	if len(sys.argv) == 1:
 		print __doc__
@@ -445,7 +511,8 @@ if __name__ == '__main__':
 		5: Problem5_1 ,
 		6: Problem5_5,
 		7: Problem7_1,
-		8: Problem8_5}
+		8: Problem8_5,
+		9: Problem9_2}
 	type = 0
 	for opt, arg in opts:
 		if opt in ("-h", "--help"):
