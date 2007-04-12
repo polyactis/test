@@ -6086,10 +6086,12 @@ def get_pattern_recurrence(pattern_fname):
 	sys.stderr.write("Done.\n")
 	return pattern_id2recurrence, pattern_id2size, frequent_pattern_counter_ls
 
-def draw_func_homo_curve(no_of_datasets, pattern_id2recurrence, pattern_id2size, top_hits_fname, size_interesting=6):
+def draw_func_homo_curve(no_of_datasets, pattern_id2recurrence, pattern_id2size, top_hits_fname, \
+	size_interesting=6, need_savefig=0, img_fname_prefix='function_homogeneity_vs_recurrence_with_size', min_no_of_patterns=50):
 	"""
 	2007-01-24
-	
+	2007-04-11
+		add need_savefig, img_fname_prefix, min_no_of_patterns
 	"""
 	import sys
 	sys.stderr.write("Counting homogeneous patterns given each recurrence...\n")
@@ -6121,13 +6123,20 @@ def draw_func_homo_curve(no_of_datasets, pattern_id2recurrence, pattern_id2size,
 	
 	sys.stderr.write("Drawing the curve...")
 	import pylab
+	pylab.clf()
 	recurrence_ls = []
 	homo_perc_ls = []
 	for i in range(len(frequent_pattern_counter_ls)):
-		if frequent_pattern_counter_ls[i]>0:
+		if frequent_pattern_counter_ls[i]>min_no_of_patterns:
 			recurrence_ls.append(i+1)
 			homo_perc_ls.append(frequent_homo_pattern_counter_ls[i]/frequent_pattern_counter_ls[i])
+	pylab.title("Function Homogeneity vs Recurrence (pattern size=%s)"%(size_interesting))
 	pylab.plot(recurrence_ls, homo_perc_ls, 'ro-')
+	if need_savefig:
+		img_fname = '%s_%s'%(img_fname_prefix, size_interesting)
+		pylab.savefig('%s.png'%img_fname, dpi=300)
+		pylab.savefig('%s.svg'%img_fname, dpi=300)
+		pylab.savefig('%s.eps'%img_fname, dpi=300)
 	pylab.show()
 	sys.stderr.write("Done.\n")
 	return recurrence_ls, homo_perc_ls, frequent_pattern_counter_ls, frequent_homo_pattern_counter_ls
