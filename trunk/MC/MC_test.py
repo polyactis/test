@@ -20,6 +20,7 @@ Examples:
 7: Problem7_1
 8: Problem8_5
 9: Problem9_2
+10: compare_integral_methods
 """
 import sys, os, math
 bit_number = math.log(sys.maxint)/math.log(2)
@@ -489,8 +490,57 @@ class Problem9_2(unittest.TestCase):
 		
 		self.plot_X_sq_Y_sq_list(sample_list)
 		self.plot_X_Y_density(sample_list)
+
+class compare_integral_methods(unittest.TestCase):
+	"""
+	2007-04-22
+		\int_{lower}^{upper}f(x)dx
+		method one to compute integral is through riemann sum
+		method two is through a probabilistic view, sample from uniform[lower, upper], and get the mean of f(x)
 		
-		
+		here, the testing f(x) is x^2
+	"""
+	def setUp(self):
+		print
+	
+	def riemann_sum(self, lower=0.0, upper=2.0, no_of_samples=1E6):
+		import sys
+		sys.stderr.write("Riemann sum...")
+		integral = 0.0
+		gap = (upper-lower)/no_of_samples
+		x_i_1 = 0.0
+		x_i = x_i_1 + gap
+		for i in range(no_of_samples):
+			x = (x_i_1+x_i)/2
+			integral += x*x*gap
+			x_i_1 += gap
+			x_i += gap
+		sys.stderr.write("Done.\n")
+		print "riemann_sum:", integral
+	
+	def probabilistic_method(self, lower=0.0, upper=2.0, no_of_samples=1E6):
+		"""
+		\int_{0}^{2}f(x)dx = \int_{0}^{2}f(x)*2*1/2dx
+		1/2 is the pdf of Uniform[0,2]
+		so it's E(2f(x)) and x is Uniform[0,2].
+		"""
+		import sys, random
+		sys.stderr.write("Probabilistic mean ...")
+		integral_ls = []
+		i = 0
+		while i<no_of_samples:
+			x = random.uniform(lower, upper)
+			integral_ls.append(x*x*2)
+			i += 1
+		sys.stderr.write("Done.\n")
+		print "probabilistic mean:", sum(integral_ls)/no_of_samples
+	
+	def test_cmp_integral(self):
+		lower=0.0
+		upper=2.0
+		no_of_samples=int(1E6)
+		self.riemann_sum(lower, upper, no_of_samples)
+		self.probabilistic_method(lower, upper, no_of_samples)
 
 if __name__ == '__main__':
 	if len(sys.argv) == 1:
@@ -512,7 +562,8 @@ if __name__ == '__main__':
 		6: Problem5_5,
 		7: Problem7_1,
 		8: Problem8_5,
-		9: Problem9_2}
+		9: Problem9_2,
+		10: compare_integral_methods}
 	type = 0
 	for opt, arg in opts:
 		if opt in ("-h", "--help"):
