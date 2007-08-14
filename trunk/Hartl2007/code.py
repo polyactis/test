@@ -125,4 +125,17 @@ for i in range(no_of_aas):
 print "no of non-synonymous substitutions per non-synonymous site is", no_of_diff_nonsyn_nts/no_of_nonsyn_nts
 print "no of synonymous substitutions per synonymous site is", no_of_diff_syn_nts/no_of_syn_nts
 
+"""
+problem 8.3, page 411
 
+#2007-08-07 R code
+
+data_ls = c(0.98,10.36,1,1,0,  -0.36,0.45,1,-1,0, 0.33,2.33,1,0,1,  0.27,2.12,1,0,1/2, 0.64,4.82,1,1/2,1/2,  -0.05,0.97,1,-1/2,1/2)
+d_matrix = matrix(data_ls, c(6,5), byrow=TRUE, dimnames=list(c('P1', 'P2', 'F1', 'F2', 'B1', 'B2'),c('logweight','fruit_weight','m', 'a', 'd')))
+d_matrix.lm_fw=lm(fruit_weight~a+d, data=data.frame(d_matrix))
+d_matrix.lm_lw=lm(logweight~a+d, data=data.frame(d_matrix))
+
+#goodness of fitness test
+1-pchisq(sum((predict(d_matrix.lm_fw)-d_matrix[,2])^2/predict(d_matrix.lm_fw)),5)
+1-pchisq(sum((predict(d_matrix.lm_lw)-d_matrix[,1])^2/predict(d_matrix.lm_lw)),5)
+"""
