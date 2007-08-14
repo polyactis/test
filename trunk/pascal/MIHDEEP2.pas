@@ -95,7 +95,7 @@ begin
           readln (file1,nmax[pop]);
 	  writeln(apop[pop]);
 	  writeln(nmax[pop]);
-          {writeln (apop[pop],' : ',nmax[pop]);}
+          {writeln (apop[pop],' : ',nmax[pop]);} {2007-07-19 yh: this line doesn't work well in linux. apop[pop] can't be outputed.}
      end;
      {lecture des noms des locus et du nb d'all�les/locus}
      for loc:=1 to nloc do
@@ -445,7 +445,7 @@ begin
 
  WriteLn(file2,fich,',', jours[js],' the',j:0,' ',mois[m],' ', a:0,
           ' � ',LeadingZero(h),'h',LeadingZero(min),'mn.');
- }
+ } {2007-07-19 yh: comment it out under linux}
  Writeln(file2,'Maximum Likelihood estimate of To and Tp, the last outcrossing rate');
  Writeln(file2, 'and the mean of previous ones respectively.');
  Writeln(file2,' Data file used: ', input);
