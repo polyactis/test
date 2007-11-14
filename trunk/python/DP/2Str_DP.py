@@ -18,7 +18,7 @@ Description:
 """
 
 import sys, getopt, os
-from numarray import *
+from numpy import *
 
 class DP:
 	'''
