@@ -7,84 +7,95 @@ from api import IPasswordStore
 from ldapplugin.api import *
 
 class LdapAuthStore(Component):
-    implements(IPasswordStore)
+	implements(IPasswordStore)
 
-    def __init__(self, ldap=None):
-        # looks for groups only if LDAP support is enabled
-        self.enabled = self.config.getbool('ldap', 'enable')
-        if not self.enabled:
-            return
-        self.util = LdapUtil(self.config)
-        # LDAP connection
-        self._ldap = ldap
-        # LDAP connection config
-        self._ldapcfg = {}
-        for name,value in self.config.options('ldap'):
-            if name in LDAP_DIRECTORY_PARAMS:
-                self._ldapcfg[name] = value
-        # user entry local cache
-        self._cache = {}
-        # max time to live for a cache entry
-        self._cache_ttl = int(self.config.get('ldap', 'cache_ttl', str(15*60)))
-        # max cache entries
-        self._cache_size = min(25, int(self.config.get('ldap', 'cache_size', '100')))
+	def __init__(self, ldap=None):
+		# looks for groups only if LDAP support is enabled
+		self.enabled = self.config.getbool('ldap', 'enable')
+		if not self.enabled:
+			return
+		self.util = LdapUtil(self.config)
+		# LDAP connection
+		self._ldap = ldap
+		# LDAP connection config
+		self._ldapcfg = {}
+		for name, value in self.config.options('ldap'):
+			if name in LDAP_DIRECTORY_PARAMS:
+				self._ldapcfg[name] = value
 
-    def has_user(self, user):
-        return user in self.get_users()
+		# user entry local cache
+		self._cache = {}
+		# max time to live for a cache entry
+		self._cache_ttl = int(self.config.get('ldap', 'cache_ttl', str(15*60)))
+		# max cache entries
+		self._cache_size = min(25, int(self.config.get('ldap', 'cache_size', '100')))
 
-    def get_users(self):
-        self._openldap()
-        ldap_users = self._ldap.get_dn(self._ldap.basedn, '(objectclass=simpleSecurityObject)')
-        users = []
-        for user in ldap_users:
-            m = re.match('uid=([^,]+)', user)
-            if m:
-                users.append(m.group(1))
-        return users
+	def has_user(self, user):
+		self.env.log.info("checking user: %s"%user)
+		return user in self.get_users()
 
-    def set_password(self, user, password):
-        user = user.encode('utf-8')
-        password = password.encode('utf-8')
-        md5_password = "{MD5}" + base64.encodestring(md5.new(password).digest()).rstrip()
+	def get_users(self):
+		self._openldap()
+		#2008-03-17 change objectclass=simpleSecurityObject to object=*
+		ldap_users = self._ldap.get_dn(self._ldap.basedn, '(objectclass=*)')
+		
+		self.env.log.info("ldap_users: %s"%(ldap_users))
+		users = []
+		for user in ldap_users:
+			m = re.match('uid=([^,]+)', user)
+			if m:
+				users.append(m.group(1))
+		return users
 
-        userdn = self._get_userdn(user)
-        p = self._ldap.get_attribute(userdn, 'userPassword')
+	def set_password(self, user, password):
+		user = user.encode('utf-8')
+		password = password.encode('utf-8')
+		md5_password = "{MD5}" + base64.encodestring(md5.new(password).digest()).rstrip()
 
-        self._ldap.add_attribute(userdn, 'userPassword', md5_password)
-        self._ldap.delete_attribute(userdn, 'userPassword', p[0])
+		userdn = self._get_userdn(user)
+		p = self._ldap.get_attribute(userdn, 'userPassword')
 
-    def check_password(self, user, password):
-        userdn = self._get_userdn(user)
-        if userdn is False:
-            return False
+		self._ldap.add_attribute(userdn, 'userPassword', md5_password)
+		self._ldap.delete_attribute(userdn, 'userPassword', p[0])
 
-        password = password.encode('utf-8')
-        p = self._ldap.get_attribute(userdn, 'userPassword')
+	def check_password(self, user, password):
+		userdn = self._get_userdn(user)
+		if userdn is False:
+			return False
+		import ldap.sasl
+		#2008-03-17 yh: try sasl binding first.
+		auth_tokens = ldap.sasl.cram_md5(user, password)
+		if self._ldap._ds.sasl_interactive_bind_s(userdn, auth_tokens)==0:
+			return True
+		
+		password = password.encode('utf-8')
+		p = self._ldap.get_attribute(userdn, 'userPassword')
+		#self.env.log.info("p: %s"%(p))
+		stored = p[0]
+		m = re.match('^({[^}]+})', stored)
+		if m:
+			mech = m.group(0)
+			if mech == '{MD5}':
+				password = "{MD5}" + base64.encodestring(md5.new(password).digest()).rstrip()
+			elif mech == '{CRYPT}':
+				password = '{CRYPT}' + crypt.crypt(password, stored[7:9])
 
-        stored = p[0]
-        m = re.match('^({[^}]+})', stored)
-        if m:
-            mech = m.group(0)
-            if mech == '{MD5}':
-                password = "{MD5}" + base64.encodestring(md5.new(password).digest()).rstrip()
-            elif mech == '{CRYPT}':
-                password = '{CRYPT}' + crypt.crypt(password, stored[7:9])
+		return (stored == password)
 
-        return (stored == password)
+	def _openldap(self):
+		"""Open a new connection to the LDAP directory"""
+		if self._ldap is None: 
+			bind = self.config.getbool('ldap', 'store_bind')
+			self._ldap = LdapConnection(self.env.log, bind, **self._ldapcfg)
+		self._ldap._open()
 
-    def _openldap(self):
-        """Open a new connection to the LDAP directory"""
-        if self._ldap is None: 
-            bind = self.config.getbool('ldap', 'store_bind')
-            self._ldap = LdapConnection(self.env.log, bind, **self._ldapcfg)
-
-    def _get_userdn(self, user):
-        self._openldap()
-
-        ldap_users = self._ldap.get_dn(self._ldap.basedn, '(objectclass=simpleSecurityObject)')
-        for u in ldap_users:
-            m = re.match('uid=([^,]+)', u)
-            if m:
-                if user == m.group(1):
-                    return u
-        return False
+	def _get_userdn(self, user):
+		self._openldap()
+		#2008-03-17 yh: change objectclass=simpleSecurityObject to object=*
+		ldap_users = self._ldap.get_dn(self._ldap.basedn, '(objectclass=*)')
+		for u in ldap_users:
+			m = re.match('uid=([^,]+)', u)
+			if m:
+				if user == m.group(1):
+					return u
+		return False
