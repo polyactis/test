@@ -213,6 +213,7 @@ association = Table('articles_keywords', metadata,
 
 
 metadata.bind = eng
+#start a transaction. it can't roll back tables created by metadata. only metadata can drop them.
 transaction = session.create_transaction()
 
 metadata.create_all()
