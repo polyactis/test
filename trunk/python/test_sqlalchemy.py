@@ -238,20 +238,38 @@ mapper(Article, articles, properties = {
 })
 mapper(Keyword, keywords)
 
-a1 = Article(headline="Python is cool!", body="(to be written)")
+a1 = Article(headline="Python is cool!")
+a1.body="(to be written)"
 a2 = Article(headline="SQLAlchemy Tutorial", body="You're reading it")
 session.save(a1)
 session.save(a2)
-session.flush()
+a3 = Article(headline='whatever 1')
+session.save(a3)
+a3 = Article(headline='whatever 2')
+session.save(a3)
+#session.flush()
+
+print "check stuff in db before flush:"
+#entries above wouldn't be found because session.flush() was commented out. Old stuff in db would be shown if it exists.
+i = 0
+row = session.query(Article).offset(i).limit(1).list()
+while row:
+	row = row[0]
+	print row.headline
+	print row.keywords
+	i += 1
+	row = session.query(Article).offset(i).limit(1).list()	#all() = list() returns a list of objects. first() returns the 1st object. one() woud raise error because 'Multiple rows returned for one()'
+
 
 k_tutorial = Keyword('tutorial')
 k_cool = Keyword('cool')
 k_unfinished = Keyword('unfinished')
 
-session.save(k_tutorial)
-session.save(k_cool)
-session.save(k_unfinished)
-session.flush()
+#2008-04-28 these lines are not necessary
+#session.save(k_tutorial)
+#session.save(k_cool)
+#session.save(k_unfinished)
+#session.flush()
 
 a1.keywords.append(k_unfinished)
 k_cool.articles.append(a1)
@@ -259,12 +277,33 @@ k_cool.articles.append(a2)
 # Or:
 k_cool.articles = [a1, a2]  # This works as well!
 a2.keywords.append(k_tutorial)
+#one flush will save all relevant unsaved objects into database
+
 session.flush()
+print "check stuff in db after flush:"
+i = 0
+row = session.query(Article).offset(i).limit(1).list()
+while row:
+	row = row[0]
+	print row.headline
+	print row.keywords
+	i += 1
+	row = session.query(Article).offset(i).limit(1).list()	#all() = list() returns a list of objects. first() returns the 1st object. one() woud raise error because 'Multiple rows returned for one()'
+
 
 #rollback all table savings
-transaction.rollback()
+yes_or_no = raw_input("Commit Database Transaction?(y/n):")
+yes_or_no = yes_or_no.lower()
+#default is rollback. so no need to take care 'n' or 'no'.
+if yes_or_no=='y' or yes_or_no=='yes':
+	transaction.commit()	#it will also execute session.flush() if it's not executed.
+
 #drop all tables created by this program
-metadata.drop_all()
+yes_or_no = raw_input("Drop All Relevant Tables?(y/n):")
+yes_or_no = yes_or_no.lower()
+#default is rollback. so no need to take care 'n' or 'no'.
+if yes_or_no=='y' or yes_or_no=='yes':
+	metadata.drop_all()
 
 print a1, a1.keywords
 print a2, a2.keywords
