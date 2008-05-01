@@ -59,14 +59,26 @@ class LdapAuthStore(Component):
 		self._ldap.delete_attribute(userdn, 'userPassword', p[0])
 
 	def check_password(self, user, password):
+		"""
+		2008-04-30 wrap "self._ldap._ds.sasl_interactive_bind_s(userdn, auth_tokens)==0:" up in try ... except ... . Except occurs when it's communicating with LDAP server with no support for sasl binding.
+		"""
 		userdn = self._get_userdn(user)
 		if userdn is False:
 			return False
 		import ldap.sasl
 		#2008-03-17 yh: try sasl binding first.
 		auth_tokens = ldap.sasl.cram_md5(user, password)
-		if self._ldap._ds.sasl_interactive_bind_s(userdn, auth_tokens)==0:
-			return True
+		#2008-04-30 wrap it up in try ... except ... . Except occurs when it's communicating with LDAP server with no support for sasl binding.
+		try:
+			if self._ldap._ds.sasl_interactive_bind_s(userdn, auth_tokens)==0:
+				return True
+		except:
+			import traceback, sys
+			self.env.log.error('%s'%traceback.print_exc())
+			self.env.log.error("%s"%repr(sys.exc_info()))
+			#2008-04-30 reopen it because the above sasl_interactive_bind_s() probably breaks down the LDAP connection
+			#not exactly sure. this line fixes the problem of getting no 'userPassword' below after this exception handling.
+			self._ldap._open()
 		
 		password = password.encode('utf-8')
 		p = self._ldap.get_attribute(userdn, 'userPassword')
