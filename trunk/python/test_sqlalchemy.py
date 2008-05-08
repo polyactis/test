@@ -167,6 +167,7 @@ So saving our User is as easy as issuing save():
 
 import sqlalchemy
 eng = sqlalchemy.engine.create_engine('postgres://yh@localhost:5432/graphdb', strategy='threadlocal')
+
 connection = eng.connect()
 result = connection.execute("select * from go2ug")
 i = 0
@@ -290,6 +291,15 @@ while row:
 	i += 1
 	row = session.query(Article).offset(i).limit(1).list()	#all() = list() returns a list of objects. first() returns the 1st object. one() woud raise error because 'Multiple rows returned for one()'
 
+"""
+#2008-05-07
+s = sqlalchemy.sql.select([articles.c.body, articles.c.headline])
+#connection = eng.connect()
+result = connection.execute(s)
+print "Fetched from Article table"
+for row in result:
+	print row
+"""
 
 #rollback all table savings
 yes_or_no = raw_input("Commit Database Transaction?(y/n):")
@@ -297,6 +307,16 @@ yes_or_no = yes_or_no.lower()
 #default is rollback. so no need to take care 'n' or 'no'.
 if yes_or_no=='y' or yes_or_no=='yes':
 	transaction.commit()	#it will also execute session.flush() if it's not executed.
+else:
+	transaction.rollback()
+
+aa = articles.alias()
+s = sqlalchemy.sql.select([aa.c.body, aa.c.headline, association.c.article_id], aa.c.article_id==association.c.article_id, order_by=[association.c.article_id])
+#connection = eng.connect()
+result = connection.execute(s).fetchmany(3)
+print "Fetched from Article table"
+for row in result:
+	print row
 
 #drop all tables created by this program
 yes_or_no = raw_input("Drop All Relevant Tables?(y/n):")
@@ -304,17 +324,19 @@ yes_or_no = yes_or_no.lower()
 #default is rollback. so no need to take care 'n' or 'no'.
 if yes_or_no=='y' or yes_or_no=='yes':
 	metadata.drop_all()
-
+"""
 print a1, a1.keywords
 print a2, a2.keywords
 print k_tutorial, k_tutorial.articles
 print k_cool, k_cool.articles
 print k_unfinished, k_unfinished.articles
-
+"""
+		
 
 def _test():
 	import doctest
 	doctest.testmod()
 
 if __name__ == "__main__":
-	_test()
+	#_test()
+	pass
