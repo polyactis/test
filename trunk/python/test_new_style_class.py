@@ -7,6 +7,13 @@ class classa(object):
 	name = 'haha'
 	def __init__(self, debug):
 		self.debug = int(debug)
+		self.func4(1,2)
+	
+	def func4(cls, a, b):
+		print 'from func4:', a,b, cls
+		
+	func4 = classmethod(func4)
+	
 	def func2(self, a,b):
 		print 'from func2: ', a,a,b,b
 	
