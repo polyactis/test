@@ -36,3 +36,8 @@ draw_multiple_panel2 <- function(filename)
 library(rpart)
 fit = rpart(is_correct~p_value+recurrence+connectivity+cluster_size+gradient, data=data, method="class",
 	control=rpart.control(cp=.00001),parms=list(prior=c(.58,.42))	)
+
+#2008-05-17 string operation
+fname = paste('/tmp/other_output/164_mprobe_mean.rda','fda', sep="")
+cat(fname, '\n')
+#String manipulation with 'as.character', 'substr', 'nchar', 'strsplit'; further, 'cat' which concatenates and writes to a file, and 'sprintf' for C like string construction.
