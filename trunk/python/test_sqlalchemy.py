@@ -164,6 +164,7 @@ So saving our User is as easy as issuing save():
 
 
 """
+import os,sys
 
 import sqlalchemy
 eng = sqlalchemy.engine.create_engine('postgres://yh@localhost:5432/graphdb', strategy='threadlocal')
@@ -219,14 +220,19 @@ transaction = session.create_transaction()
 
 metadata.create_all()
 
-class Article(object):
+sys.path.insert(0, os.path.join(os.path.expanduser('~/script')))
+from pymodule.db import TableClass
+
+class Article(TableClass):
 	def __init__(self, headline=None, body=None):
 		self.headline = headline
 		self.body = body
+	
 	def __repr__(self):
 		return 'Article %d: "%s"' % (self.article_id, self.headline)
 
 class Keyword(object):
+	keyword_name = None
 	def __init__(self, name=None):
 		self.keyword_name = name
 	def __repr__(self):
@@ -291,16 +297,17 @@ while row:
 	i += 1
 	row = session.query(Article).offset(i).limit(1).list()	#all() = list() returns a list of objects. first() returns the 1st object. one() woud raise error because 'Multiple rows returned for one()'
 
-"""
+#"""
 #2008-05-07
-s = sqlalchemy.sql.select([articles.c.body, articles.c.headline])
+s = sqlalchemy.sql.select([Article.c.body, Article.c.headline])
 #connection = eng.connect()
 result = connection.execute(s)
-print "Fetched from Article table"
+print "Fetched from Article table before commit"
 for row in result:
 	print row
-"""
+#"""
 
+print dir(Article)
 #rollback all table savings
 yes_or_no = raw_input("Commit Database Transaction?(y/n):")
 yes_or_no = yes_or_no.lower()
@@ -316,6 +323,8 @@ s = sqlalchemy.sql.select([aa.c.body, aa.c.headline, association.c.article_id], 
 result = connection.execute(s).fetchmany(3)
 print "Fetched from Article table"
 for row in result:
+	print row.headline
+	print row['headline']
 	print row
 
 #drop all tables created by this program
