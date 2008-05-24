@@ -192,6 +192,16 @@ engine = create_engine('sqlite:///:memory:', echo=True)
 
 from sqlalchemy import create_session
 session = create_session()
+
+from sqlalchemy.orm.session import Session
+session = Session(bind=eng)
+"""
+2008-05-24
+	direct engine binding here.
+	but it's not necessary. session seems to be able to figure out engine on its own. although it could be bad when the engine
+	was changed, it still binds the old engine.
+
+"""
 from sqlalchemy import Table, Column, Integer, String, MetaData, ForeignKey, clear_mappers
 from sqlalchemy.orm import mapper, relation
 
