@@ -22,7 +22,9 @@ def draw():
 	ys = [x+i*10 for i in x]
 	
 	# We need to set the plot limits, the will not autoscale
-	ax = axes()
+	fig = gcf()
+	ax = fig.add_subplot(2,1,1)
+	#ax = axes()
 	ax.set_xlim((amin(x),amax(x)))
 	ax.set_ylim((amin(amin(ys)),amax(amax(ys))))
 	
@@ -37,12 +39,16 @@ def draw():
 									linestyle = 'solid', picker=True)
 	line_segments.set_array(x)
 	ax.add_collection(line_segments)
-	fig = gcf()
 	fig.canvas.mpl_connect('pick_event', on_canvas_pick)
 	axcb = fig.colorbar(line_segments)
 	axcb.set_label('Line Number')
 	ax.set_title('Line Collection with mapped colors')
 	sci(line_segments) # This allows interactive changing of the colormap.
+	
+	ax = fig.add_subplot(2,1,2)
+	ax.scatter(x,x, picker=True)
+	
+	
 	show()
 
 def draw2():
