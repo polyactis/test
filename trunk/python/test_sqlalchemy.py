@@ -190,11 +190,16 @@ http://www.rmunn.com/sqlalchemy-tutorial/tutorial.html
 from sqlalchemy import create_engine
 engine = create_engine('sqlite:///:memory:', echo=True)
 
-from sqlalchemy import create_session
-session = create_session()
+#from sqlalchemy import create_session
+#session = create_session()
 
 from sqlalchemy.orm.session import Session
-session = Session(bind=eng)
+#session = Session(bind=eng)
+
+from sqlalchemy.orm import sessionmaker
+Session = sessionmaker(autoflush=True, transactional=True)
+Session.configure(bind=eng)
+session = Session()
 """
 2008-05-24
 	direct engine binding here.
@@ -202,10 +207,13 @@ session = Session(bind=eng)
 	was changed, it still binds the old engine.
 
 """
-from sqlalchemy import Table, Column, Integer, String, MetaData, ForeignKey, clear_mappers
+from sqlalchemy import Table, Column, Integer, String, MetaData, ForeignKey
+#clear_mappers
 from sqlalchemy.orm import mapper, relation
 
 metadata = MetaData()
+metadata.bind = eng
+
 articles = Table('articles', metadata,
 	Column('article_id', Integer, primary_key = True),
 	Column('headline', String(150)),
@@ -223,10 +231,9 @@ association = Table('articles_keywords', metadata,
 	Column('keyword_id', Integer, ForeignKey('keywords.keyword_id')),
 )
 
-
-metadata.bind = eng
 #start a transaction. it can't roll back tables created by metadata. only metadata can drop them.
-transaction = session.create_transaction()
+#transaction = session.create_transaction()
+#session.begin()
 
 metadata.create_all()
 
@@ -248,7 +255,7 @@ class Keyword(object):
 	def __repr__(self):
 		return self.keyword_name
 
-clear_mappers()
+#clear_mappers()
 
 mapper(Article, articles, properties = {
     'keywords': relation(Keyword, secondary=association, backref='articles'),
@@ -309,7 +316,7 @@ while row:
 
 #"""
 #2008-05-07
-s = sqlalchemy.sql.select([Article.c.body, Article.c.headline])
+s = sqlalchemy.sql.select([Article.c.body, Article.c.headline], Article.c.headline=='Python is cool!')
 #connection = eng.connect()
 result = connection.execute(s)
 print "Fetched from Article table before commit"
@@ -323,9 +330,11 @@ yes_or_no = raw_input("Commit Database Transaction?(y/n):")
 yes_or_no = yes_or_no.lower()
 #default is rollback. so no need to take care 'n' or 'no'.
 if yes_or_no=='y' or yes_or_no=='yes':
-	transaction.commit()	#it will also execute session.flush() if it's not executed.
+	session.commit()
+	#transaction.commit()	#it will also execute session.flush() if it's not executed.
 else:
-	transaction.rollback()
+	session.rollback()
+	#transaction.rollback()
 
 aa = articles.alias()
 s = sqlalchemy.sql.select([aa.c.body, aa.c.headline, association.c.article_id], aa.c.article_id==association.c.article_id, order_by=[association.c.article_id])
