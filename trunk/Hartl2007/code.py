@@ -75,7 +75,9 @@ for aa, degeneracy in aa2degeneracy.iteritems():
 	print standard_translator.table.back_table[aa], degeneracy
 
 
-#the two loops above reveal that there're 3 AAs (Ser, Arg, Leu) with 6 triplets. so aa2degeneracy can't be used. This exposes a potential problem in synonymous and  non-synonymous calculations. (written down in the margin of page 341)
+#the two loops above reveal that there're 3 AAs (Ser, Arg, Leu) with 6 triplets. so aa2degeneracy can't be used to calculate #synonymous/non sites.
+#This exposes a twist in the counting of synonymous and  non-synonymous sites,
+#2009-01-02 as described in the legend of table 7.2 in page 341 of Hartl2007, the 1st nucleotide of Leu/Arg is held as two-fold degenerate.
 
 triplet2aa = standard_translator.table.forward_table
 triplet2degeneracy = {}
