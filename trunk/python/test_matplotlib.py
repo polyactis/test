@@ -121,5 +121,75 @@ def draw2():
 	a.set_title('PolyCollection using offsets')
 	P.show()
 
+def drawArrow():
+	"""
+	2010-4-15
+		test drawing arrow
+	"""
+	import pylab
+	pylab.clf()
+	arrow_params={'length_includes_head':True, 'shape':'right', \
+		'head_starts_at_zero':True}
+	
+	pylab.arrow(0.1, 0.1, 0.8, 0.5, \
+			fc='blue', ec='red', alpha=0.6, width=0.1, head_width=0.3, \
+			head_length=0.2, **arrow_params)
+	pylab.annotate("start",
+			xy=(0.2, 0.2), xycoords='data',
+			xytext=(0.8, 0.8), textcoords='data',
+			arrowprops=dict(arrowstyle="->", color='b', 
+							connectionstyle="arc3"),
+			picker=True,)
+	pylab.show()
+	
+def drawLegend():
+	"""
+	2010-4-15
+		test legend
+	"""
+	import numpy as np
+	import matplotlib.pyplot as plt
+	
+	a = np.arange(0,3,.02)
+	b = np.arange(0,3,.02)
+	c = np.exp(a)
+	d = c[::-1]
+	
+	fig = plt.figure()
+	ax = fig.add_subplot(111)
+	ax.plot(a,c,'k--',a,d,'k:',a,c+d,'k')
+	bbox_props = dict(boxstyle="round", fc="r", ec="0.5", alpha=0.5)	#2010-4-15 text()'s bbox argument value 
+	leg = ax.legend(('Model length', 'Data length', 'Total message length'),
+				'upper center', shadow=True)#, bbox=bbox_props)	#2010-4-15 legen() doesn't accept bbox argument. text() does. 
+	ax.set_ylim([-1,20])
+	ax.grid(False)
+	ax.set_xlabel('Model complexity --->')
+	ax.set_ylabel('Message length --->')
+	ax.set_title('Minimum Message Length')
+	
+	ax.set_yticklabels([])
+	ax.set_xticklabels([])
+	
+	# set some legend properties.  All the code below is optional.  The
+	# defaults are usually sensible but if you need more control, this
+	# shows you how
+	
+	# the matplotlib.patches.Rectangle instance surrounding the legend
+	frame  = leg.get_frame()  
+	frame.set_facecolor('0.80')	# set the frame face color to light gray
+	frame.set_alpha(0.60)
+	
+	#bbox = leg.get_bbox_patch()	# 2010-4-15 get_bbox_patch() is only for text()
+	
+	# matplotlib.text.Text instances
+	for t in leg.get_texts():
+		t.set_fontsize('small')	# the legend text fontsize
+	
+	# matplotlib.lines.Line2D instances
+	for l in leg.get_lines():
+		l.set_linewidth(1.5)  # the legend line width
+	plt.show()
+
+
 if __name__ == '__main__':
-	draw()
+	drawArrow()
