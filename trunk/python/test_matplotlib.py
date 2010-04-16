@@ -124,22 +124,39 @@ def draw2():
 def drawArrow():
 	"""
 	2010-4-15
+		connect the pick_event
+		add ConnectionPatch
+	2010-4-15
 		test drawing arrow
 	"""
 	import pylab
 	pylab.clf()
+	
+	fig = pylab.gcf()
+	fig.canvas.mpl_connect('pick_event', on_canvas_pick)
+	
 	arrow_params={'length_includes_head':True, 'shape':'right', \
 		'head_starts_at_zero':True}
 	
+	# 2010-4-15 the width doesn't fare well during zoom-in and out. 
 	pylab.arrow(0.1, 0.1, 0.8, 0.5, \
 			fc='blue', ec='red', alpha=0.6, width=0.1, head_width=0.3, \
-			head_length=0.2, **arrow_params)
+			head_length=0.2, picker=True, **arrow_params)
+	
 	pylab.annotate("start",
 			xy=(0.2, 0.2), xycoords='data',
 			xytext=(0.8, 0.8), textcoords='data',
 			arrowprops=dict(arrowstyle="->", color='b', 
-							connectionstyle="arc3"),
-			picker=True,)
+							connectionstyle="arc3"), picker=True,)	# picker only applies to the text area, not the arrow
+	
+	from matplotlib.patches import ConnectionPatch
+	xy = (0.8, 0.2)
+	# 2010-4-15 ConnectionPatch is picker-able.
+	con = ConnectionPatch(xyA=xy, xyB=(0.2,0.8), coordsA="data", coordsB="data", picker=True, alpha=0.5, color='r',\
+						arrowstyle="-|>", shrinkA=0, shrinkB=0,\
+						mutation_scale=50, fc="b")	#fc controls the color of closed area, e.g. the tip of the arrow ("|>")
+	ax = pylab.gca()
+	ax.add_artist(con)
 	pylab.show()
 	
 def drawLegend():
