@@ -1,0 +1,134 @@
+      SUBROUTINE VISC(DTIM,ALF,NX,NY,U,V,CCXA,CCYA)
+C
+C     VISCOUS STEPS OF THE STEADY FLOW EQUATION
+C     
+C
+      DIMENSION U(41,41),DU(41,41),V(41,41),DV(41,41),EMX(3),EMY(3)
+	DIMENSION R(41,41),B(5,41),RRU(41),RRV(41),DDU(41),DDV(41)
+     	    
+
+C	COMPUTE U	
+	NXP=NX-1
+	NXS=NX+1
+	NYP=NY-1
+	NXN=NX
+	NYN=NYP
+	NXPP=NXN-1
+	NYPP=NYN-1
+
+	EMX(1) = 0.
+	EMX(2) = 1.
+	EMX(3) = 0.
+	DO 1 J = 1,3
+    	EMY(J) =EMX(J)
+    1	CONTINUE
+
+	CALL REDIF(ALF, DTIM, NXN, NYN, U) 
+C
+C	TRIDIAGONAL SYSTEM IN THE X-DIRECTION
+C
+	DO 21 K = 2,NYN 
+	DO 19 J = 2,NXN
+	JM = J - 1  
+	B(2,JM) = EMX(1) - CCXA
+	B(3,JM) = EMX(2) + 2.*CCXA  
+	B(4,JM) = EMX(3) - CCXA
+   19	RRU(JM) = R(K,J)
+	B(2,1) = 0.  
+	DU(K,NXS) = DU(K,NXP)
+	B(2,JM) =B(2,JM) +B(4,JM)
+	B(4,JM) = 0.
+C
+	CALL BANFAC(B,NXPP,1)
+	CALL BANSOL(RRU,DDU,B,NXPP,1)
+
+C
+	DO 20 J = 2,NXN
+	JM = J - 1
+   20	R(K,J) = DDU(JM)
+   21	CONTINUE
+C
+C	TRIDIAGONAL SYSTEMS IN THE Y-DIRECTION
+C
+      DO 24 J = 2,NXN
+	DO 22 K = 2,NYN 
+     	KM = K - 1
+     	B(2,KM) = EMY(1) - CCYA
+     	B(3,KM) = EMY(2) + 2.*CCYA
+	B(4,KM) = EMY(3) - CCYA
+   22	RRU(KM) = R(K,J)
+	B(2,1) = 0.
+	DU(NY,J) = 0.
+	B(4,KM) = 0.
+C
+	CALL BANFAC(B,NYPP,1)
+	CALL BANSOL(RRU,DDU,B,NYPP,1)
+
+	DO 23 K = 2, NYN
+	KM = K-1
+	DU(K,J) = DDU(KM)
+   23	U(K,J) = U(K,J) +DDU(KM)
+   24	CONTINUE
+
+
+C     
+C	COMPUTE V
+C
+	NXN=NXP
+ 	NYN=NYP
+	NXPP=NXN-1
+	NYPP=NYN-1
+      CALL REDIF(ALF, DTIM, NXN, NYN, V)
+   
+C
+C	TRIDIAGONAL SYSTEMS IN THE X-DIRECTION
+C
+	DO 27 K = 2,NYN
+	DO 25 J = 2,NXN
+	JM = J - 1
+	B(2,JM) = EMX(1) - CCXA
+	B(3,JM) = EMX(2) + 2.*CCXA
+	B(4,JM) = EMX(3) - CCXA
+   25	RRV(JM) = R(K,J)
+	B(2,1) = 0.
+	DV(K,NX) = 0.
+	B(4,JM) = 0.
+C
+	CALL BANFAC(B,NXPP,1)
+	CALL BANSOL(RRV,DDV,B,NXPP,1)
+C
+	DO 26 J = 2,NXN 
+	JM = J - 1
+   26	R(K,J) = DDV(JM)
+   27	CONTINUE
+C
+C	TRIDIAGONAL SYSTEMS IN THE Y-DIRECTION
+C
+	DO 30 J = 2,NXN
+	DO 28 K = 2,NYN
+	KM = K - 1
+	B(2,KM) = EMY(1) - CCYA
+	B(3,KM) = EMY(2) + 2.*CCYA
+	B(4,KM) = EMY(3) - CCYA
+   28	RRV(KM) = R(K,J)
+	B(2,1) = 0.
+	DV(NY,J) = 0.
+	B(4,KM) = 0.
+c
+	CALL BANFAC(B,NYPP,1)
+	CALL BANSOL(RRV,DDV,B,NYPP,1)
+
+	DO 29 K = 2, NYN
+	KM = K - 1
+	DV(K,J) = DDV(KM)
+   29	V(K,J) = V(K,J) + DDV(KM)
+   30	CONTINUE
+      RETURN
+      END
+
+
+
+
+
+
+
