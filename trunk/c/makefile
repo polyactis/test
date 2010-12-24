@@ -1,4 +1,4 @@
-SUBDIRS = swig gsl
+SUBDIRS = ../swig ../gsl
 .PHONY: clean_subdirs subdirs $(SUBDIRS)
 
 GCOV=-ftest-coverage -fprofile-arcs -fbranch-probabilities
@@ -13,12 +13,12 @@ all:	$(ctg) $(c++tg) $(f_thread_tg)  reciprocal subdirs
 
 subdirs:
 	for dir in $(SUBDIRS); do \
-		-$(MAKE) -C $$dir; \
+		$(MAKE) -C $$dir; \
 	done
 	
 clean_subdirs:
 	for dir in $(SUBDIRS); do \
-		-$(MAKE) -C $$dir clean; \
+		$(MAKE) -C $$dir clean; \
 	done
 	
 .c.o:
