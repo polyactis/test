@@ -1,5 +1,0 @@
-app : app.c test.c
-
-libtest.a: test.c temp_file.c
-
-libtest.so: test.c  temp_file.c
