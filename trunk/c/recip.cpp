@@ -1,6 +1,6 @@
 #include <stdio.h>
 #include "reciprocal.hpp"
-#include <iostream.h>
+#include <iostream>
 
 int main()
 {
@@ -11,7 +11,7 @@ int main()
 
 int test::t1(int i)
 {
-	cout <<"introduction ..";
+	std::cout <<"introduction ..";
 	printf ("%d\n",i);
 	return 3*i;
 }
