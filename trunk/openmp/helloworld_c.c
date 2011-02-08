@@ -4,6 +4,7 @@
 #define CHUNKSIZE 100 /*defines the chunk size as 1 contiguous iteration*/
 
 int main(int argc, char *argv[]) {
+	const int N = 1000000;
 	int th_id, nthreads;
 #pragma omp parallel private(th_id)
 	{
@@ -16,7 +17,6 @@ int main(int argc, char *argv[]) {
 		}
 	}
 
-	const int N = 100000000;
 	int i, a[N];
 
 #pragma omp parallel for
