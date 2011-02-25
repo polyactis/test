@@ -6215,6 +6215,31 @@ def count_haifeng_prediction_coverage(curs, info_matrix_fname, haifeng_pred_fnam
 		print "%s\t%s(%s)\t%s"%(count, go_id, go_id2name[go_id], count/counter)
 
 
+class TestProperty(object):
+	def __init__(self):
+		"""
+		2011-2-24
+			test property getter and setter. check the bottom to see the effect
+		"""
+		self._x = 3
+	
+	@property
+	def var(self):
+		return self._x
+	
+	@var.setter
+	def var(self, value=None):
+		self._x = value*5
+
+	"""
+	>>> tp = TestProperty()
+	>>> tp.var
+	3
+	>>> tp.var = 3
+	>>> tp.var
+	15
+	"""
+	
 #01-03-06 for easy console
 import sys, os, math
 bit_number = math.log(sys.maxint)/math.log(2)
