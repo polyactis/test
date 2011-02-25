@@ -6228,7 +6228,14 @@ class TestProperty(object):
 		return self._x
 	
 	@var.setter
-	def var(self, value=None):
+	def var(self, value=None, arg2=None):
+		"""
+		2011-2-24
+			second argument "arg2" is useless.
+			don't know how to pass it into the function body.
+			
+			tp.var(5,3) raise "int object is not callable" exception.
+		"""
 		self._x = value*5
 
 	"""
