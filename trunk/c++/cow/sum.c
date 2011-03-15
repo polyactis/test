@@ -2,6 +2,7 @@
 /* 21/08/1998 */
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <math.h>
 
 int main (void) {
