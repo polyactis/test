@@ -1,12 +1,14 @@
 function [value]=KK2011SpringProjectFunction(epsilon, max_n, max_m)
 
-% comp_Estep_SBL Implements the E_step of the SBL algorithm
-% It can be used either in the multiple sample or the single sample
-% approach.
+% 2011-4-12 function to calculate values of a fomula
 
-epsilon = num2str(epsilon);
-max_n = num2str(max_n);
-max_m = num2str(max_m);
+disp(epsilon);
+disp(max_n);
+disp(max_m);
+
+epsilon = str2num(epsilon);
+max_n = str2num(max_n);
+max_m = str2num(max_m);
 
 value = calculateFirstTerm(epsilon, max_n);
 
