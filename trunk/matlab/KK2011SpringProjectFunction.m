@@ -4,6 +4,10 @@ function [value]=KK2011SpringProjectFunction(epsilon, max_n, max_m)
 % It can be used either in the multiple sample or the single sample
 % approach.
 
+epsilon = num2str(epsilon);
+max_n = num2str(max_n);
+max_m = num2str(max_m);
+
 value = calculateFirstTerm(epsilon, max_n);
 
 value = value + calculateFirstTerm(epsilon, max_m);
