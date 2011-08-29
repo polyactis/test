@@ -1,0 +1,135 @@
+#!/bin/bash
+
+set -e
+
+
+#######################################################################
+#
+#  Settings
+#
+CLUSTER_HOSTNAME="viz-login.isi.edu"
+CLUSTER_SCHEDULER="condor"
+CLUSTER_WORK_DIR="/nfs/ccg1/90-day-scratch"
+CLUSTER_PEGASUS_HOME="/cluster-software/pegasus/testing/latest"
+CLUSTER_GLOBUS_LOCATION="/cluster-software/globus/5.0.2"
+
+CLUSTER_HOSTNAME="grid4.hoffman2.idre.ucla.edu"
+CLUSTER_SCHEDULER="sge"
+CLUSTER_HOME="/u/home/eeskin/polyacti"
+CLUSTER_WORK_DIR=$CLUSTER_HOME"/pg_work"
+CLUSTER_PEGASUS_HOME=$CLUSTER_HOME"/bin/pegasus"
+CLUSTER_GLOBUS_LOCATION="/home/globus/gt5.0.4"
+
+#CLUSTER_HOSTNAME="hpc-login2.usc.edu"
+#CLUSTER_SCHEDULER="pbs"
+#CLUSTER_HOME="/home/rcf-47/yuhuang"
+#CLUSTER_WORK_DIR=$CLUSTER_HOME"/pg_work"
+#CLUSTER_PEGASUS_HOME=$CLUSTER_HOME"/bin/pegasus"
+#CLUSTER_GLOBUS_LOCATION="/usr/usc/globus/default/"
+#######################################################################
+
+if test $# -lt 1 ; then
+    echo "Please specify local or other site name as argument. Examples:"
+    echo "  ./submit local finalOutputDir"
+    echo "  ./submit TestCluster finalOutputDir"
+    echo ""
+    echo " 1st argument (site name) could be local or TestCluster"
+    echo " finalOutputDir is the directory which would contain the final genotype matrix and all files requested to be transferred out. If it doesn't exist, pegasus would create one."
+    exit 1
+fi
+
+
+TOPDIR=`pwd`
+TARGET=$1
+finalOutputDir=$2
+
+# figure out where Pegasus is installed
+export PEGASUS_HOME=`which pegasus-plan | sed 's/\/bin\/pegasus-plan//'`
+if [ "x$PEGASUS_HOME" = "x" ]; then
+    echo "Unable to determine location of your Pegasus install"
+    echo "Please make sure pegasus-plan is in your path"
+    exit 1
+fi 
+
+if [ "x$GLOBUS_LOCATION" = "x" ]; then
+    echo "Please set GLOBUS_LOCATION to the location of your Pegasus install"
+    exit 1
+fi 
+
+# generate the input file
+echo "This is sample input to KEG" >f.a
+
+# generate the dax
+export PYTHONPATH=$PEGASUS_HOME/lib/python
+./blackdiamond.py $CLUSTER_PEGASUS_HOME >blackdiamond.dax
+
+# create the site catalog
+cat >sites.xml <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<sitecatalog xmlns="http://pegasus.isi.edu/schema/sitecatalog" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://pegasus.isi.edu/schema/sitecatalog http://pegasus.isi.edu/schema/sc-3.0.xsd" version="3.0">
+    <site  handle="local" arch="x86" os="LINUX">
+        <grid  type="gt2" contact="localhost/jobmanager-fork" scheduler="Fork" jobtype="auxillary"/>
+        <head-fs>
+            <scratch>
+                <shared>
+                    <file-server protocol="file" url="file://" mount-point="$TOPDIR/$finalOutputDir"/>
+                    <internal-mount-point mount-point="$TOPDIR/work/outputs" free-size="100G" total-size="30G"/>
+                </shared>
+            </scratch>
+            <storage>
+                <shared>
+                    <file-server protocol="file" url="file://" mount-point="$TOPDIR/$finalOutputDir"/>
+                    <internal-mount-point mount-point="$TOPDIR/work/outputs" free-size="100G" total-size="30G"/>
+                </shared>
+            </storage>
+        </head-fs>
+        <replica-catalog  type="LRC" url="rlsn://dummyValue.url.edu" />
+        <profile namespace="env" key="PEGASUS_HOME" >$PEGASUS_HOME</profile>
+        <profile namespace="env" key="GLOBUS_LOCATION" >$GLOBUS_LOCATION</profile>
+        <profile namespace="env" key="HOME">$HOME</profile>
+    </site>
+    <site  handle="TestCluster" arch="x86_64" os="LINUX">
+        <grid  type="gt2" contact="$CLUSTER_HOSTNAME/jobmanager-fork" scheduler="Fork" jobtype="auxillary"/>
+        <grid  type="gt2" contact="$CLUSTER_HOSTNAME/jobmanager-$CLUSTER_SCHEDULER" scheduler="unknown" jobtype="compute"/>
+        <head-fs>
+            <scratch>
+                <shared>
+                    <file-server protocol="gsiftp" url="gsiftp://$CLUSTER_HOSTNAME" mount-point="$CLUSTER_WORK_DIR"/>
+                    <internal-mount-point mount-point="$CLUSTER_WORK_DIR"/>
+                </shared>
+            </scratch>
+            <storage>
+                <shared>
+                    <file-server protocol="gsiftp" url="gsiftp://$CLUSTER_HOSTNAME" mount-point="$CLUSTER_WORK_DIR"/>
+                    <internal-mount-point mount-point="$CLUSTER_WORK_DIR"/>
+                </shared>
+            </storage>
+        </head-fs>
+        <replica-catalog  type="LRC" url="rlsn://dummyValue.url.edu" />
+        <profile namespace="env" key="GLOBUS_LOCATION" >$CLUSTER_GLOBUS_LOCATION</profile>
+        <profile namespace="env" key="PEGASUS_HOME" >$CLUSTER_PEGASUS_HOME</profile>
+        <profile namespace="env" key="HOME">$CLUSTER_HOME</profile>
+        <profile namespace="env" key="LD_LIBRARY_PATH" >/u/local/apps/python/2.6.5/lib:/u/local/intel/11.1/openmpi/1.4.2/lib:/u/local/compilers/intel/11.1/073/mkl/lib/em64t:/u/local/compilers/intel/11.1/073/lib/intel64</profile>
+        
+        <profile namespace="env" key="OMPI_MCA_mpi_leave_pinned">1</profile>
+        <profile namespace="env" key="OMPI_MCA_mpi_warn_on_fork">0</profile>
+        <profile namespace="env" key="PYTHON_DIR">/u/local/apps/python/2.6.5</profile>
+        <profile namespace="env" key="PYTHON_INC">/u/local/apps/python/2.6.5/include/python2.6</profile>
+        <profile namespace="env" key="PYTHON_LIB">/u/local/apps/python/2.6.5/lib</profile>
+	<profile namespace="env" key="PATH" >$CLUSTER_HOME/bin:/u/local/apps/lynx/2.8.7/bin:/u/local/apps/python/2.6.5/bin:/u/local/python/2.6/bin:/u/systems/SGE6.2u5/bin/lx26-amd64:/u/local/compilers/intel/11.1/073/bin/intel64/:/u/local/intel/11.1/openmpi/1.4.2/bin:/u/local/bin:/u/local/sbin:/usr/kerberos/bin:/usr/local/bin:/bin:/usr/bin</profile>
+        <profile namespace="env" key="PYTHONPATH">$CLUSTER_HOME/lib/python:/u/local/apps/python/2.6.5/lib/python2.6/site-packages:/u/local/python/2.6/lib/python2.6/site-packages</profile>
+    </site>
+</sitecatalog>
+EOF
+
+#<profile namespace="globus" key="queue" >cmb</profile>
+
+# plan and submit the  workflow
+pegasus-plan \
+    -D pegasus.user.properties=pegasusrc \
+    --sites $TARGET \
+    --dir work \
+    --output local \
+    --dax blackdiamond.dax \
+    --submit
+

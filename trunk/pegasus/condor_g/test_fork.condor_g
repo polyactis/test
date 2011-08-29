@@ -1,0 +1,22 @@
+#test.sub
+universe=grid
+grid_resource = gt5 grid4.hoffman2.idre.ucla.edu/jobmanager-sge
+executable=/u/home/eeskin/polyacti/bin/pegasus/bin/keg
+arguments = -a test -o /dev/stdout
+copy_to_spool = false
+output = /home/yh/condor_g/job.out.$(Cluster).$(Process)
+error = /home/yh/condor_g/job.err.$(Cluster).$(Process)
+log = /home/yh/condor_g/job.log.$(Cluster).$(Process)
+stream_output = false
+stream_error  = false
+periodic_release = (NumSystemHolds <= 3)
+periodic_remove = (NumSystemHolds > 3)
+notification=never
+transfer_error = true
+transfer_output = true
+transfer_executable = false
+globusrsl = (jobtype=single)
+remote_initialdir = /tmp
+#globusrsl = (two_phase=6)
+queue
+#end test.sub

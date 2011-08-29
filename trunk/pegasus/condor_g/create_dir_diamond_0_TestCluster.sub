@@ -1,0 +1,39 @@
+######################################################################
+# PEGASUS WMS GENERATED SUBMIT FILE
+# DAG : diamond, Index = 0, Count = 1
+# SUBMIT FILE NAME : create_dir_diamond_0_TestCluster.sub
+######################################################################
+stream_error  = false
+stream_output = false
+environment = GLOBUS_LOCATION=/home/globus/gt5.0.4;PEGASUS_HOME=/u/home/eeskin/polyacti/bin/pegasus;
+arguments = " -n pegasus::dirmanager -N pegasus::dirmanager:1.0 -R TestCluster -L diamond -T 2011-08-10T15:39:02-07:00 /u/home/eeskin/polyacti/bin/pegasus/bin/pegasus-dirmanager --create --dir /u/home/eeskin/polyacti/yh/pegasus/diamond/20110810T153903-0700"
+copy_to_spool = false
+error = /home/yh/grid-blackdiamond-python/work/yh/pegasus/diamond/20110810T153903-0700/create_dir_diamond_0_TestCluster.err
+executable = /u/home/eeskin/polyacti/bin/pegasus/bin/kickstart
+globusrsl = (jobtype=single)
+grid_resource = gt5 grid4.hoffman2.idre.ucla.edu/jobmanager-fork
+log = /home/yh/grid-blackdiamond-python/work/yh/pegasus/diamond/20110810T153903-0700/diamond-0.log
+notification = NEVER
+output = /home/yh/grid-blackdiamond-python/work/yh/pegasus/diamond/20110810T153903-0700/create_dir_diamond_0_TestCluster.out
+periodic_release = (NumSystemHolds <= 3)
+periodic_remove = (NumSystemHolds > 3)
+priority = 800
+remote_initialdir = /tmp
+submit_event_user_notes = pool:TestCluster
+transfer_error = true
+transfer_executable = false
+transfer_output = true
+universe = grid
++pegasus_generator = "Pegasus"
++pegasus_version = "3.0.3"
++pegasus_wf_name = "diamond-0"
++pegasus_wf_time = "20110810T153903-0700"
++pegasus_wf_xformation = "pegasus::dirmanager"
++pegasus_job_class = 6
++pegasus_job_id = "create_dir_diamond_0_TestCluster"
++pegasus_site = "TestCluster"
++pegasus_job_runtime = 0
+queue
+######################################################################
+# END OF SUBMIT FILE
+######################################################################
