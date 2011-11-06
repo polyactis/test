@@ -1,0 +1,37 @@
+####2011-11-5
+## a condor_g submit script for hpc-login2.usc.edu
+## run ``condor_submit test.condor_g.uschpc`` on commandline
+
+universe        = grid
+#universe	= vanilla
+grid_resource   = gt2 hpc-login2.usc.edu/jobmanager-pbs
+
+# stay in queue on failures
+#on_exit_remove = (ExitBySignal == False) && (ExitCode == 0)
+
+executable = /bin/hostname
+
+stream_output = False
+stream_error  = False
+
+WhenToTransferOutput = ON_EXIT
+TransferExecutable = false
+
+output = job.out.$(Cluster).$(Process)
+error = job.err.$(Cluster).$(Process)
+log = job.log.$(Cluster).$(Process)
+
+transfer_output = true
+transfer_error = true
+
+#globusscheduler = $$(gatekeeper_url)
+#requirements = (TARGET.gatekeeper_url =!= UNDEFINED)
+#requirements = (memory>=512)
+
+#globusrsl = (maxwalltime=60)
+#globusrsl = &(executable='/bin/hostname')
+#globusrsl = (jobtype=single)
+#globusrsl = &( executable=/u/home/eeskin/polyacti/test.pl)(maxmemory = 512 )( maxwalltime = 60 )(stdin=/dev/null)( jobtype =single )( count = 1 )
+
+notification = NEVER
+queue
