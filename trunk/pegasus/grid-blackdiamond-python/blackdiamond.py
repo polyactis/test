@@ -4,17 +4,14 @@ from Pegasus.DAX3 import *
 import sys
 import os
 
-if len(sys.argv) != 3:
-	print "Usage: %s PEGASUS_HOME SITE" % (sys.argv[0])
+if len(sys.argv) != 4:
+	print "Usage: %s PEGASUS_HOME TargetRunSite InputSite" % (sys.argv[0])
 	sys.exit(1)
 
 pegasus_home = sys.argv[1]
-site_handler = sys.argv[2]
-#2011.11.16
-if site_handler!='condorpool':	#other sites need the initial input to be from "local", where it knows how to transfer.
-	input_site_handler = 'local'
-else:
-	input_site_handler = site_handler
+input_site_handler = sys.argv[2]
+site_handler = sys.argv[3]
+
 # Create a abstract dag
 diamond = ADAG("whatever")
 namespace='diamond'

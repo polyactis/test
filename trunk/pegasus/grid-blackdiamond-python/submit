@@ -19,6 +19,8 @@ UCLA_CLUSTER_HOME="/u/home/eeskin/polyacti"
 UCLA_CLUSTER_WORK_DIR=$UCLA_CLUSTER_HOME"/pg_work"
 UCLA_CLUSTER_PEGASUS_HOME=$UCLA_CLUSTER_HOME"/bin/pegasus"
 UCLA_CLUSTER_GLOBUS_LOCATION="/home/globus/gt5.0.4"
+UCLA_CLUSTER_SCRATCH="/u/scratch/polyacti/pegasus"
+UCLA_CLUSTER_LOCAL_SCRATCH="/work/polyactis/pegasus"
 
 USC_CLUSTER_HOSTNAME="hpc-login2.usc.edu"
 USC_CLUSTER_SCHEDULER="pbs"
@@ -31,23 +33,29 @@ USC_CLUSTER_GLOBUS_LOCATION="/usr/local/globus/default/"
 
 if test $# -lt 2 ; then
 	echo "Please specify local or other site name as argument. Examples:"
-	echo "  ./submit site finalOutputDir [CLUSTER_PEGASUS_HOME]"
+	echo "  ./submit site finalOutputDir [CLUSTER_PEGASUS_HOME] [STORAGE_SITE]"
 	echo ""
-	echo " 1st argument (site name) could be local, condorpool, hoffman2 or uschpc."
-	echo " finalOutputDir is the directory which would contain the final genotype matrix and all files requested to be transferred out. If it doesn't exist, pegasus would create one."
-	echo " CLUSTER_PEGASUS_HOME could be /u/home/eeskin/point/bin/pegasus or /home/cmb-03/mn/yuhuang/bin/pegasus depending on the site for hoffman2/uschpc. For local or condorpool, omit it so it's set to self-detected PEGASUS_HOME."
+	echo " 1st argument (site name) could be local, condorpool, hoffman2, uschpc, hcondor (hoffman2 condor)."
+	echo " finalOutputDir is the directory which would contain the final output files (destination of stage-out). If it doesn't exist, pegasus would create one."
+	echo " CLUSTER_PEGASUS_HOME could be /u/home/eeskin/point/bin/pegasus or /home/cmb-03/mn/yuhuang/bin/pegasus depending on the site for hoffman2/uschpc. For local or condorpool, omit it so it's set to the default self-detected PEGASUS_HOME."
+	echo "	STORAGE_SITE is the site to which final output is staged to. default to local."
 	exit 1
 fi
 
 
 TOPDIR=`pwd`
-TARGET=$1
+TargetSite=$1
 finalOutputDir=$2
 CLUSTER_PEGASUS_HOME=$3
+STORAGE_SITE=$4
 
+if [ -z $STORAGE_SITE ]; then
+	STORAGE_SITE="local"
+fi
+echo STORAGE_SITE $STORAGE_SITE
 CONDOR_HOME_DIR=$HOME
 VCF_PERL5LIB=script/vcftools/perl
-freeSpace="50000G"
+freeSpace="500000G"
 
 # figure out where Pegasus is installed
 export PEGASUS_HOME=`which pegasus-plan | sed 's/\/bin\/*pegasus-plan//'`
@@ -75,25 +83,25 @@ echo "This is sample input to KEG" >f.a
 
 # generate the dax
 export PYTHONPATH=$PYTHONPATH:$PEGASUS_HOME/lib/python
-./blackdiamond.py $CLUSTER_PEGASUS_HOME $TARGET >blackdiamond.dax
+./blackdiamond.py $CLUSTER_PEGASUS_HOME $TargetSite >blackdiamond.dax
 
 # create the site catalog
 cat >sites.xml <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <sitecatalog xmlns="http://pegasus.isi.edu/schema/sitecatalog" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://pegasus.isi.edu/schema/sitecatalog http://pegasus.isi.edu/schema/sc-3.0.xsd" version="3.0">
-	<site  handle="local" arch="x86" os="LINUX">
+	<site  handle="local" arch="x86_64" os="LINUX">
 		<grid  type="gt2" contact="localhost/jobmanager-fork" scheduler="Fork" jobtype="auxillary"/>
 		<head-fs>
 			<scratch>
 			<shared>
 				<file-server protocol="file" url="file://" mount-point="$TOPDIR/$finalOutputDir"/>
-				<internal-mount-point mount-point="$TOPDIR/work/outputs" free-size="100G" total-size="30G"/>
+				<internal-mount-point mount-point="$TOPDIR/$finalOutputDir" free-size="$freeSpace" total-size="$freeSpace"/>
 			</shared>
 			</scratch>
 			<storage>
 			<shared>
 				<file-server protocol="file" url="file://" mount-point="$TOPDIR/$finalOutputDir"/>
-				<internal-mount-point mount-point="$TOPDIR/work/outputs" free-size="100G" total-size="30G"/>
+				<internal-mount-point mount-point="$TOPDIR/$finalOutputDir" free-size="$freeSpace" total-size="freeSpace"/>
 			</shared>
 			</storage>
 		</head-fs>
@@ -108,14 +116,14 @@ cat >sites.xml <<EOF
 		<head-fs>
 			<scratch>
 			<shared>
-				<file-server protocol="file" url="file://" mount-point="$TOPDIR/$finalOutputDir"/>
-				<internal-mount-point mount-point="$TOPDIR/work/outputs" free-size="$freeSpace" total-size="$freeSpace"/>
+				<file-server protocol="file" url="file://" mount-point="$TOPDIR/scratch"/>
+				<internal-mount-point mount-point="$TOPDIR/scratch" free-size="$freeSpace" total-size="$freeSpace"/>
 			</shared>
 			</scratch>
 			<storage>
 			<shared>
 				<file-server protocol="file" url="file://" mount-point="$TOPDIR/$finalOutputDir"/>
-				<internal-mount-point mount-point="$TOPDIR/work/outputs" free-size="$freeSpace" total-size="$freeSpace"/>
+				<internal-mount-point mount-point="$TOPDIR/$finalOutputDir" free-size="$freeSpace" total-size="$freeSpace"/>
 			</shared>
 			</storage>
 		</head-fs>
@@ -127,6 +135,48 @@ cat >sites.xml <<EOF
 		<profile namespace="env" key="HOME" >$CONDOR_HOME_DIR</profile>
 		<profile namespace="env" key="PATH" >$CONDOR_HOME_DIR/bin:$PATH</profile>
 		<profile namespace="env" key="GLOBUS_LOCATION" >$GLOBUS_LOCATION</profile>
+	</site>
+	<site  handle="hcondor" arch="x86_64" os="LINUX">
+		<grid  type="gt2" contact="localhost/jobmanager-fork" scheduler="Fork" jobtype="auxillary"/>
+		<grid  type="gt2" contact="localhost/jobmanager-fork" scheduler="unknown" jobtype="compute"/>
+		<head-fs>
+			<scratch>
+			<local>
+				<file-server protocol="file" url="file://" mount-point="$UCLA_CLUSTER_LOCAL_SCRATCH"/>
+				<internal-mount-point mount-point="$UCLA_CLUSTER_LOCAL_SCRATCH" free-size="$freeSpace" total-size="$freeSpace"/>
+			</local>
+			<shared>
+				<file-server protocol="file" url="file://" mount-point="$UCLA_CLUSTER_SCRATCH"/>
+				<internal-mount-point mount-point="$UCLA_CLUSTER_SCRATCH" free-size="$freeSpace" total-size="$freeSpace"/>
+			</shared>
+			</scratch>
+			<storage>
+			<local>
+				<file-server protocol="file" url="file://" mount-point="$UCLA_CLUSTER_LOCAL_SCRATCH"/>
+				<internal-mount-point mount-point="$UCLA_CLUSTER_LOCAL_SCRATCH" free-size="$freeSpace" total-size="$freeSpace"/>
+			</local>
+			<shared>
+				<file-server protocol="file" url="file://" mount-point="$UCLA_CLUSTER_WORK_DIR"/>
+				<internal-mount-point mount-point="$UCLA_CLUSTER_WORK_DIR" free-size="$freeSpace" total-size="$freeSpace"/>
+			</shared>
+			</storage>
+		</head-fs>
+		<replica-catalog  type="LRC" url="rlsn://dummyValue.url.edu" />
+		<profile namespace="pegasus" key="style" >condor</profile>
+		<profile namespace="condor" key="universe" >vanilla</profile>
+		<profile namespace="env" key="PEGASUS_HOME" >$UCLA_CLUSTER_PEGASUS_HOME</profile>
+		<profile namespace="env" key="PERL5LIB">$UCLA_CLUSTER_HOME/$VCF_PERL5LIB</profile>
+		<profile namespace="env" key="HOME" >$UCLA_CLUSTER_HOME</profile>
+		<profile namespace="env" key="PATH" >$UCLA_CLUSTER_HOME/bin:$PATH</profile>
+		<profile namespace="env" key="GLOBUS_LOCATION" >$UCLA_CLUSTER_GLOBUS_LOCATION</profile>
+		<profile namespace="env" key="LD_LIBRARY_PATH" >/u/local/apps/python/2.6.5/lib:/u/local/intel/11.1/openmpi/1.4.2/lib:/u/local/compilers/intel/11.1/073/mkl/lib/em64t:/u/local/compilers/intel/11.1/073/lib/intel64</profile>
+		
+		<profile namespace="env" key="OMPI_MCA_mpi_leave_pinned">1</profile>
+		<profile namespace="env" key="OMPI_MCA_mpi_warn_on_fork">0</profile>
+		<profile namespace="env" key="PYTHON_DIR">/u/local/apps/python/2.6.5</profile>
+		<profile namespace="env" key="PYTHON_INC">/u/local/apps/python/2.6.5/include/python2.6</profile>
+		<profile namespace="env" key="PYTHON_LIB">/u/local/apps/python/2.6.5/lib</profile>
+		<profile namespace="env" key="PYTHONPATH">$UCLA_CLUSTER_HOME/lib/python:/u/local/apps/python/2.6.5/lib/python2.6/site-packages:/u/local/python/2.6/lib/python2.6/site-packages</profile>
 	</site>
 	<site  handle="hoffman2" arch="x86_64" os="LINUX">
 		<grid  type="gt2" contact="$UCLA_CLUSTER_HOSTNAME/jobmanager-fork" scheduler="Fork" jobtype="auxillary"/>
@@ -189,10 +239,10 @@ echo $CLASSPATH
 # plan and submit the  workflow
 pegasus-plan \
 	--conf pegasusrc \
-	--sites $TARGET \
+	--sites $TargetSite \
 	--dir work \
 	--relative-dir $finalOutputDir \
-	--output local \
+	--output $STORAGE_SITE \
 	--dax blackdiamond.dax \
 	--submit
 #	--cluster horizontal \
