@@ -4,16 +4,16 @@
 		<grid  type="gt2" contact="localhost/jobmanager-fork" scheduler="Fork" jobtype="auxillary"/>
 		<head-fs>
 			<scratch>
-			<shared>
-				<file-server protocol="file" url="file://" mount-point="/u/home/eeskin/polyacti/script/test/pegasus/grid-blackdiamond-python/hcondor.2011.11.18T1849"/>
-				<internal-mount-point mount-point="/u/home/eeskin/polyacti/script/test/pegasus/grid-blackdiamond-python/hcondor.2011.11.18T1849" free-size="500000G" total-size="500000G"/>
-			</shared>
+				<shared>
+				<file-server protocol="file" url="file://" mount-point="/u/home/eeskin/polyacti/script/test/pegasus/grid-blackdiamond-python/scratch"/>
+				<internal-mount-point mount-point="/u/home/eeskin/polyacti/script/test/pegasus/grid-blackdiamond-python/scratch" free-size="50000G" total-size="50000G"/>
+				</shared>
 			</scratch>
 			<storage>
-			<shared>
-				<file-server protocol="file" url="file://" mount-point="/u/home/eeskin/polyacti/script/test/pegasus/grid-blackdiamond-python/hcondor.2011.11.18T1849"/>
-				<internal-mount-point mount-point="/u/home/eeskin/polyacti/script/test/pegasus/grid-blackdiamond-python/hcondor.2011.11.18T1849" free-size="500000G" total-size="freeSpace"/>
-			</shared>
+				<shared>
+				<file-server protocol="file" url="file://" mount-point="/u/home/eeskin/polyacti/script/test/pegasus/grid-blackdiamond-python/hcondor.2011.11.19T1410"/>
+				<internal-mount-point mount-point="/u/home/eeskin/polyacti/script/test/pegasus/grid-blackdiamond-python/hcondor.2011.11.19T1410" free-size="50000G" total-size="50000G"/>
+				</shared>
 			</storage>
 		</head-fs>
 		<replica-catalog  type="LRC" url="rlsn://dummyValue.url.edu" />
@@ -28,13 +28,13 @@
 			<scratch>
 			<shared>
 				<file-server protocol="file" url="file://" mount-point="/u/home/eeskin/polyacti/script/test/pegasus/grid-blackdiamond-python/scratch"/>
-				<internal-mount-point mount-point="/u/home/eeskin/polyacti/script/test/pegasus/grid-blackdiamond-python/scratch" free-size="500000G" total-size="500000G"/>
+				<internal-mount-point mount-point="/u/home/eeskin/polyacti/script/test/pegasus/grid-blackdiamond-python/scratch" free-size="50000G" total-size="50000G"/>
 			</shared>
 			</scratch>
 			<storage>
 			<shared>
-				<file-server protocol="file" url="file://" mount-point="/u/home/eeskin/polyacti/script/test/pegasus/grid-blackdiamond-python/hcondor.2011.11.18T1849"/>
-				<internal-mount-point mount-point="/u/home/eeskin/polyacti/script/test/pegasus/grid-blackdiamond-python/hcondor.2011.11.18T1849" free-size="500000G" total-size="500000G"/>
+				<file-server protocol="file" url="file://" mount-point="/u/home/eeskin/polyacti/script/test/pegasus/grid-blackdiamond-python/hcondor.2011.11.19T1410"/>
+				<internal-mount-point mount-point="/u/home/eeskin/polyacti/script/test/pegasus/grid-blackdiamond-python/hcondor.2011.11.19T1410" free-size="50000G" total-size="50000G"/>
 			</shared>
 			</storage>
 		</head-fs>
@@ -45,7 +45,6 @@
 		<profile namespace="env" key="PERL5LIB">/u/home/eeskin/polyacti/script/vcftools/perl</profile>
 		<profile namespace="env" key="HOME" >/u/home/eeskin/polyacti</profile>
 		<profile namespace="env" key="PATH" >/u/home/eeskin/polyacti/bin:/u/home/eeskin/polyacti/bin/globus/bin:/u/home/eeskin/polyacti/bin/globus/sbin:/u/home/eeskin/polyacti/bin/condor/sbin:/u/home/eeskin/polyacti/bin/condor/bin:/u/home/eeskin/polyacti/bin/:/u/home/eeskin/polyacti/bin/jdk/bin:/u/home/eeskin/polyacti/bin/pegasus/bin:/u/home/eeskin/polyacti/bin/condor/sbin:/u/home/eeskin/polyacti/bin/condor/bin:/u/home/eeskin/polyacti/bin/:/u/home/eeskin/polyacti/bin/jdk/bin:/u/home/eeskin/polyacti/bin/pegasus/bin:/u/home/eeskin/polyacti/bin/condor/sbin:/u/home/eeskin/polyacti/bin/condor/bin:/u/home/eeskin/polyacti/bin/:/u/home/eeskin/polyacti/bin/jdk/bin:/u/home/eeskin/polyacti/bin/pegasus/bin:/u/home/eeskin/polyacti/bin/condor/bin:/u/home/eeskin/polyacti/bin/:/u/home/eeskin/polyacti/bin/jdk/bin:/u/local/apps/lynx/2.8.7/bin:/u/local/apps/python/2.6.5/bin:/u/local/python/2.6/bin:/u/home/eeskin/polyacti/bin/:/u/home/eeskin/polyacti/bin/jdk/bin:/u/systems/SGE6.2u5/bin/lx26-amd64:/u/local/compilers/intel/11.1/073/bin/intel64/:/u/local/intel/11.1/openmpi/1.4.4/bin:/u/local/bin:/u/local/sbin:/usr/kerberos/bin:/usr/local/bin:/bin:/usr/bin</profile>
-		<profile namespace="env" key="GLOBUS_LOCATION" >/u/home/eeskin/polyacti/bin/globus</profile>
 	</site>
 	<site  handle="hcondor" arch="x86_64" os="LINUX">
 		<grid  type="gt2" contact="localhost/jobmanager-fork" scheduler="Fork" jobtype="auxillary"/>
@@ -54,21 +53,21 @@
 			<scratch>
 			<local>
 				<file-server protocol="file" url="file://" mount-point="/work/polyactis/pegasus"/>
-				<internal-mount-point mount-point="/work/polyactis/pegasus" free-size="500000G" total-size="500000G"/>
+				<internal-mount-point mount-point="/work/polyactis/pegasus" free-size="50000G" total-size="50000G"/>
 			</local>
 			<shared>
 				<file-server protocol="file" url="file://" mount-point="/u/scratch/polyacti/pegasus"/>
-				<internal-mount-point mount-point="/u/scratch/polyacti/pegasus" free-size="500000G" total-size="500000G"/>
+				<internal-mount-point mount-point="/u/scratch/polyacti/pegasus" free-size="50000G" total-size="50000G"/>
 			</shared>
 			</scratch>
 			<storage>
 			<local>
 				<file-server protocol="file" url="file://" mount-point="/work/polyactis/pegasus"/>
-				<internal-mount-point mount-point="/work/polyactis/pegasus" free-size="500000G" total-size="500000G"/>
+				<internal-mount-point mount-point="/work/polyactis/pegasus" free-size="50000G" total-size="50000G"/>
 			</local>
 			<shared>
 				<file-server protocol="file" url="file://" mount-point="/u/home/eeskin/polyacti/pg_work"/>
-				<internal-mount-point mount-point="/u/home/eeskin/polyacti/pg_work" free-size="500000G" total-size="500000G"/>
+				<internal-mount-point mount-point="/u/home/eeskin/polyacti/pg_work" free-size="50000G" total-size="50000G"/>
 			</shared>
 			</storage>
 		</head-fs>
@@ -76,9 +75,9 @@
 		<profile namespace="pegasus" key="style" >condor</profile>
 		<profile namespace="condor" key="universe" >vanilla</profile>
 		<profile namespace="env" key="PEGASUS_HOME" >/u/home/eeskin/polyacti/bin/pegasus</profile>
-		<profile namespace="env" key="PERL5LIB">/u/home/eeskin/polyacti/script/vcftools/perl</profile>
-		<profile namespace="env" key="HOME" >/u/home/eeskin/polyacti</profile>
-		<profile namespace="env" key="PATH" >/u/home/eeskin/polyacti/bin:/u/home/eeskin/polyacti/bin/globus/bin:/u/home/eeskin/polyacti/bin/globus/sbin:/u/home/eeskin/polyacti/bin/condor/sbin:/u/home/eeskin/polyacti/bin/condor/bin:/u/home/eeskin/polyacti/bin/:/u/home/eeskin/polyacti/bin/jdk/bin:/u/home/eeskin/polyacti/bin/pegasus/bin:/u/home/eeskin/polyacti/bin/condor/sbin:/u/home/eeskin/polyacti/bin/condor/bin:/u/home/eeskin/polyacti/bin/:/u/home/eeskin/polyacti/bin/jdk/bin:/u/home/eeskin/polyacti/bin/pegasus/bin:/u/home/eeskin/polyacti/bin/condor/sbin:/u/home/eeskin/polyacti/bin/condor/bin:/u/home/eeskin/polyacti/bin/:/u/home/eeskin/polyacti/bin/jdk/bin:/u/home/eeskin/polyacti/bin/pegasus/bin:/u/home/eeskin/polyacti/bin/condor/bin:/u/home/eeskin/polyacti/bin/:/u/home/eeskin/polyacti/bin/jdk/bin:/u/local/apps/lynx/2.8.7/bin:/u/local/apps/python/2.6.5/bin:/u/local/python/2.6/bin:/u/home/eeskin/polyacti/bin/:/u/home/eeskin/polyacti/bin/jdk/bin:/u/systems/SGE6.2u5/bin/lx26-amd64:/u/local/compilers/intel/11.1/073/bin/intel64/:/u/local/intel/11.1/openmpi/1.4.4/bin:/u/local/bin:/u/local/sbin:/usr/kerberos/bin:/usr/local/bin:/bin:/usr/bin</profile>
+		<profile namespace="env" key="PERL5LIB">/script/vcftools/perl</profile>
+		<profile namespace="env" key="HOME" ></profile>
+		<profile namespace="env" key="PATH" >/bin:/u/home/eeskin/polyacti/bin/globus/bin:/u/home/eeskin/polyacti/bin/globus/sbin:/u/home/eeskin/polyacti/bin/condor/sbin:/u/home/eeskin/polyacti/bin/condor/bin:/u/home/eeskin/polyacti/bin/:/u/home/eeskin/polyacti/bin/jdk/bin:/u/home/eeskin/polyacti/bin/pegasus/bin:/u/home/eeskin/polyacti/bin/condor/sbin:/u/home/eeskin/polyacti/bin/condor/bin:/u/home/eeskin/polyacti/bin/:/u/home/eeskin/polyacti/bin/jdk/bin:/u/home/eeskin/polyacti/bin/pegasus/bin:/u/home/eeskin/polyacti/bin/condor/sbin:/u/home/eeskin/polyacti/bin/condor/bin:/u/home/eeskin/polyacti/bin/:/u/home/eeskin/polyacti/bin/jdk/bin:/u/home/eeskin/polyacti/bin/pegasus/bin:/u/home/eeskin/polyacti/bin/condor/bin:/u/home/eeskin/polyacti/bin/:/u/home/eeskin/polyacti/bin/jdk/bin:/u/local/apps/lynx/2.8.7/bin:/u/local/apps/python/2.6.5/bin:/u/local/python/2.6/bin:/u/home/eeskin/polyacti/bin/:/u/home/eeskin/polyacti/bin/jdk/bin:/u/systems/SGE6.2u5/bin/lx26-amd64:/u/local/compilers/intel/11.1/073/bin/intel64/:/u/local/intel/11.1/openmpi/1.4.4/bin:/u/local/bin:/u/local/sbin:/usr/kerberos/bin:/usr/local/bin:/bin:/usr/bin</profile>
 		<profile namespace="env" key="GLOBUS_LOCATION" >/home/globus/gt5.0.4</profile>
 		<profile namespace="env" key="LD_LIBRARY_PATH" >/u/local/apps/python/2.6.5/lib:/u/local/intel/11.1/openmpi/1.4.2/lib:/u/local/compilers/intel/11.1/073/mkl/lib/em64t:/u/local/compilers/intel/11.1/073/lib/intel64</profile>
 		
@@ -87,16 +86,16 @@
 		<profile namespace="env" key="PYTHON_DIR">/u/local/apps/python/2.6.5</profile>
 		<profile namespace="env" key="PYTHON_INC">/u/local/apps/python/2.6.5/include/python2.6</profile>
 		<profile namespace="env" key="PYTHON_LIB">/u/local/apps/python/2.6.5/lib</profile>
-		<profile namespace="env" key="PYTHONPATH">/u/home/eeskin/polyacti/lib/python:/u/local/apps/python/2.6.5/lib/python2.6/site-packages:/u/local/python/2.6/lib/python2.6/site-packages</profile>
+		<profile namespace="env" key="PYTHONPATH">/lib/python:/u/local/apps/python/2.6.5/lib/python2.6/site-packages:/u/local/python/2.6/lib/python2.6/site-packages</profile>
 	</site>
 	<site  handle="hoffman2" arch="x86_64" os="LINUX">
-		<grid  type="gt2" contact="grid4.hoffman2.idre.ucla.edu/jobmanager-fork" scheduler="Fork" jobtype="auxillary"/>
-		<grid  type="gt2" contact="grid4.hoffman2.idre.ucla.edu/jobmanager-sge" scheduler="unknown" jobtype="compute"/>
+		<grid  type="gt5" contact="grid4.hoffman2.idre.ucla.edu/jobmanager-fork" scheduler="Fork" jobtype="auxillary"/>
+		<grid  type="gt5" contact="grid4.hoffman2.idre.ucla.edu/jobmanager-sge" scheduler="unknown" jobtype="compute"/>
 		<head-fs>
 			<scratch>
 			<shared>
-				<file-server protocol="gsiftp" url="gsiftp://grid4.hoffman2.idre.ucla.edu" mount-point="/u/home/eeskin/polyacti/pg_work"/>
-				<internal-mount-point mount-point="/u/home/eeskin/polyacti/pg_work"/>
+				<file-server protocol="gsiftp" url="gsiftp://grid4.hoffman2.idre.ucla.edu/" mount-point="/u/home/eeskin/polyacti/pg_work"/>
+				<internal-mount-point mount-point="/u/home/eeskin/polyacti/pg_work" />
 			</shared>
 			</scratch>
 			<storage>
@@ -107,9 +106,12 @@
 			</storage>
 		</head-fs>
 		<replica-catalog  type="LRC" url="rlsn://dummyValue.url.edu" />
-		<profile namespace="env" key="GLOBUS_LOCATION" >/home/globus/gt5.0.4</profile>
 		<profile namespace="env" key="PEGASUS_HOME" >/u/home/eeskin/polyacti/bin/pegasus</profile>
+		<profile namespace="env" key="GLOBUS_LOCATION" >/home/globus/gt5.0.4</profile>
+		<profile namespace="globus" key="maxwalltime">1430</profile>
+		<profile namespace="env" key="BOWTIE_INDEXES">/u/home/eeskin/polyacti/bin/bowtieIndexes</profile>
 		<profile namespace="env" key="HOME">/u/home/eeskin/polyacti</profile>
+		<profile namespace="env" key="PERL5LIB">/u/home/eeskin/polyacti/script/vcftools/perl/</profile>
 		<profile namespace="env" key="LD_LIBRARY_PATH" >/u/local/apps/python/2.6.5/lib:/u/local/intel/11.1/openmpi/1.4.2/lib:/u/local/compilers/intel/11.1/073/mkl/lib/em64t:/u/local/compilers/intel/11.1/073/lib/intel64</profile>
 		
 		<profile namespace="env" key="OMPI_MCA_mpi_leave_pinned">1</profile>
@@ -117,7 +119,7 @@
 		<profile namespace="env" key="PYTHON_DIR">/u/local/apps/python/2.6.5</profile>
 		<profile namespace="env" key="PYTHON_INC">/u/local/apps/python/2.6.5/include/python2.6</profile>
 		<profile namespace="env" key="PYTHON_LIB">/u/local/apps/python/2.6.5/lib</profile>
-		<profile namespace="env" key="PATH" >/u/home/eeskin/polyacti/bin:/u/local/apps/lynx/2.8.7/bin:/u/local/apps/python/2.6.5/bin:/u/local/python/2.6/bin:/u/systems/SGE6.2u5/bin/lx26-amd64:/u/local/compilers/intel/11.1/073/bin/intel64/:/u/local/intel/11.1/openmpi/1.4.2/bin:/u/local/bin:/u/local/sbin:/usr/kerberos/bin:/usr/local/bin:/bin:/usr/bin</profile>
+		<profile namespace="env" key="PATH" >/u/home/eeskin/polyacti/bin:/u/local/apps/lynx/2.8.7/bin:/u/local/apps/python/2.6.5/bin:/u/local/apps/python/2.6.5/bin/:/u/systems/SGE6.2u5/bin/lx26-amd64:/u/local/compilers/intel/11.1/073/bin/intel64/:/u/local/intel/11.1/openmpi/1.4.2/bin:/u/local/bin:/u/local/sbin:/usr/kerberos/bin:/usr/local/bin:/bin:/usr/bin</profile>
 		<profile namespace="env" key="PYTHONPATH">/u/home/eeskin/polyacti/lib/python:/u/local/apps/python/2.6.5/lib/python2.6/site-packages:/u/local/python/2.6/lib/python2.6/site-packages</profile>
 	</site>
 	<site  handle="uschpc" arch="x86_64" os="LINUX">
@@ -134,10 +136,12 @@
 		</head-fs>
 		<replica-catalog  type="LRC" url="rlsn://dummyValue.url.edu" />
 		<profile namespace="env" key="PEGASUS_HOME" >/home/cmb-03/mn/yuhuang/bin/pegasus</profile>
-		<profile namespace="env" key="GLOBUS_LOCATION" >/usr/local/globus/default/</profile>
-		<profile namespace="globus" key="maxwalltime">1430</profile>
+		<profile namespace="env" key="GLOBUS_LOCATION" >/usr/usc/globus/default/</profile>
 		<profile namespace="globus" key="queue" >cmb</profile>
+		<profile namespace="globus" key="maxwalltime">4800</profile>
+		<profile namespace="env" key="BOWTIE_INDEXES">/home/cmb-03/mn/yuhuang/bin/bowtieIndexes</profile>
 		<profile namespace="env" key="HOME">/home/cmb-03/mn/yuhuang</profile>
+		<profile namespace="env" key="PERL5LIB">/home/cmb-03/mn/yuhuang/script/vcftools/perl/</profile>
 		<profile namespace="env" key="PATH" >/home/cmb-03/mn/yuhuang/bin:/usr/usc/python/default/bin/:/usr/usc/root/5.27.02/bin:/usr/usc/matlab/2009a/bin:/usr/kerberos/bin:/usr/local/bin:/bin:/usr/bin:/usr/usc/jdk/default/bin/</profile>
 		<profile namespace="env" key="PYTHONPATH">/home/cmb-03/mn/yuhuang/lib/python:/usr/usc/python/default/lib/python2.6/site-packages/</profile>
 	</site>
