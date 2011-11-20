@@ -1,4 +1,1 @@
-#!/bin/sh
-
-workdir=$1
-pegasus-run -Dpegasus.user.properties=$workdir/pegasus*.properties --nodatabase $workdir
+/u/home/eeskin/polyacti/script/GWASModules/pymodule/pegasus/reSubmit.sh
