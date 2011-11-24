@@ -48,7 +48,7 @@ diamond.addExecutable(env)
 preprocess = Job(namespace=namespace, name=e_preprocess.name, version=version)
 b1 = File("f.b1")
 b2 = File("f.b2")
-preprocess.addArguments("-a preprocess","-T30","-i",a,"-o",b1,b2)	#3600 is in seconds
+preprocess.addArguments("-a preprocess","-T10","-i",a,"-o",b1,b2)	#3600 is in seconds
 preprocess.uses(a, link=Link.INPUT, transfer=True, register=True)
 preprocess.uses(b1, link=Link.OUTPUT, transfer=True, register=True)
 preprocess.uses(b2, link=Link.OUTPUT, transfer=True, register=True)
@@ -77,6 +77,7 @@ frl.addProfile(Profile(Namespace.CONDOR, key="request_memory", value="%s"%(memor
 frl.addProfile(Profile(Namespace.CONDOR, key="request_disk", value="1024"))
 #frl.addProfile(Profile(Namespace.CONDOR, key="requirements", value="(memory>=%s)"%500))
 diamond.addJob(frl)
+diamond.addDependency(Dependency(parent=preprocess, child=frl))
 
 # Add right Findrange job
 frr = Job(namespace=namespace, name=e_findrange.name, version=version)
@@ -90,15 +91,17 @@ frr.addProfile(Profile(Namespace.CONDOR, key="request_memory", value="%s"%(memor
 frr.addProfile(Profile(Namespace.CONDOR, key="request_disk", value="1024"))
 #frr.addProfile(Profile(Namespace.CONDOR, key="requirements", value="(memory>=%s)"%memoryForSmallJob))
 diamond.addJob(frr)
+diamond.addDependency(Dependency(parent=preprocess, child=frr))
 
 #2011.11.16 add 10 findrange jobs
 for i in xrange(10):
 	findrangeJob = Job(namespace=namespace, name=e_findrange.name, version=version)
 	output = File("f.c%s"%i)
-	findrangeJob.addArguments("-a findrange", "-T600", "-i", b2, "-o", output)
+	findrangeJob.addArguments("-a findrange", "-T600", "-i", b2, "-o", output)	#run 600 seconds
 	findrangeJob.uses(b2, link=Link.INPUT, transfer=True, register=True)
 	findrangeJob.uses(output, link=Link.OUTPUT, transfer=True, register=True)
-	findrangeJob.addProfile(Profile(Namespace.GLOBUS, key="maxwalltime", value="650"))
+	findrangeJob.addProfile(Profile(Namespace.GLOBUS, key="maxwalltime", value="650"))	#650 minutes
+	findrangeJob.addProfile(Profile(Namespace.CONDOR, key="requirements", value="(Target.TimeToLive>=%s)"%((i+1)*60*60)))	# the condor daemon has at least (i+1) hours to live
 	#findrangeJob.addProfile(Profile(Namespace.CONDOR, key="request_cpus", value="1"))
 	#findrangeJob.addProfile(Profile(Namespace.CONDOR, key="request_memory", value="%s"%(memoryForSmallJob)))
 	#findrangeJob.addProfile(Profile(Namespace.CONDOR, key="request_disk", value="1024"))
@@ -127,15 +130,15 @@ env_job = Job(namespace=namespace, name=env.name, version=version)
 #env_job.addArguments(">", env_out)
 #env_job.uses(env_out, link=Link.OUTPUT, transfer=True, register=True)
 env_job.addProfile(Profile(Namespace.GLOBUS, key="maxwalltime", value="5"))
-#env_job.addProfile(Profile(Namespace.CONDOR, key="request_cpus", value="1"))
+env_job.addProfile(Profile(Namespace.CONDOR, key="request_cpus", value="1"))
+#2011-11-24 make the job run on a machine whose condor daemon has less than 5 hours to live (sometimes it's impossible to find a slot for this job
+env_job.addProfile(Profile(Namespace.CONDOR, key="requirements", value="(Target.TimeToLive<=%s)"%(5*60*60) ))
 #env_job.addProfile(Profile(Namespace.CONDOR, key="request_memory", value="%s"%memoryForSmallJob))
 #env_job.addProfile(Profile(Namespace.CONDOR, key="request_disk", value="1024"))
 #env_job.addProfile(Profile(Namespace.CONDOR, key="requirements", value="(memory>=%s)"%memoryForSmallJob))
 diamond.addJob(env_job)
 
 # Add control-flow dependencies
-diamond.addDependency(Dependency(parent=preprocess, child=frl))
-diamond.addDependency(Dependency(parent=preprocess, child=frr))
 diamond.addDependency(Dependency(parent=frl, child=analyzeJob))
 diamond.addDependency(Dependency(parent=frr, child=analyzeJob))
 
