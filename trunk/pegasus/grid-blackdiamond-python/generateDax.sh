@@ -6,7 +6,7 @@ if test $# -lt 1 ; then
 	echo ""
 	echo "	This script calls blackdiamond.py to generate a black diamond dag in xml."
 	echo "	TargetSite is the site on which the dag would run."
-	echo "	Default InputSite is local."
+	echo "	Default InputSite is local. If TargetSite is some condor local pool, InputSite have to be identical, otherwise error due to no defined transfer mechanism between local and condor."
 	echo "	CLUSTER_PEGASUS_HOME could be /u/home/eeskin/point/bin/pegasus or /home/cmb-03/mn/yuhuang/bin/pegasus depending on the site for hoffman2/uschpc. For local or condorpool, omit it so it's set to the default self-detected PEGASUS_HOME."
 	exit 1
 fi
