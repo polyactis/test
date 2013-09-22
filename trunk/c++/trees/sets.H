@@ -9,9 +9,12 @@
 
 #include<stdio.h>
 #include<stdlib.h>
-#include<iostream.h>
-#include<strstream.h>
-#include<tcl.h>
+#include<iostream>
+#include<ostream>
+#include<istream>
+
+#include<strstream>
+#include<tcl/tcl.h>
 #include<ctype.h>
 
 // **********************************************************************
@@ -53,10 +56,10 @@ template <class KeyClass, class ValueClass>
 class SetDatabase {
   friend class SetDatabaseHandleIterator<KeyClass,ValueClass>;
   friend class SetDatabaseHandle<KeyClass,ValueClass>;
-  friend ostream & operator<<<KeyClass, ValueClass>(ostream & s, 
-						    const SetDatabase & d);
-  friend istream & operator>><KeyClass, ValueClass>(istream & s, 
-						    SetDatabase & d);
+  friend ostream & operator<< (ostream & s,
+						    const SetDatabase<KeyClass, ValueClass> & d);
+  friend istream & operator>> (istream & s,
+						    SetDatabase<KeyClass, ValueClass> & d);
 public:
   inline int GetKeyType() const {return databaseKeyType;}
 
@@ -199,16 +202,11 @@ private:
 template <class KeyClass, class ValueClass>
 class SetDatabaseHandle {
   friend class SetDatabaseHandleIterator<KeyClass,ValueClass>;
-  friend SetDatabaseHandle operator&<KeyClass, ValueClass>
-  (SetDatabaseHandle&, SetDatabaseHandle &);
-  friend SetDatabaseHandle operator|<KeyClass, ValueClass>
-  (SetDatabaseHandle &, SetDatabaseHandle &);
-  friend SetDatabaseHandle operator-<KeyClass, ValueClass>
-  (SetDatabaseHandle &, SetDatabaseHandle &);
-  friend ostream& operator<<<KeyClass, ValueClass>
-  (ostream&,const SetDatabaseHandle<KeyClass,ValueClass>&);
-  friend istream& operator>><KeyClass, ValueClass>
-  (istream&,SetDatabaseHandle<KeyClass,ValueClass>&);
+  friend SetDatabaseHandle<KeyClass, ValueClass> operator& (SetDatabaseHandle<KeyClass, ValueClass>&, SetDatabaseHandle<KeyClass, ValueClass> &);
+  friend SetDatabaseHandle<KeyClass, ValueClass> operator| (SetDatabaseHandle<KeyClass, ValueClass> &, SetDatabaseHandle<KeyClass, ValueClass> &);
+  friend SetDatabaseHandle<KeyClass, ValueClass> operator- (SetDatabaseHandle<KeyClass, ValueClass> &, SetDatabaseHandle<KeyClass, ValueClass> &);
+  friend ostream& operator<< (ostream&,const SetDatabaseHandle<KeyClass,ValueClass>&);
+  friend istream& operator>> (istream&,SetDatabaseHandle<KeyClass,ValueClass>&);
 public:
   SetDatabaseHandle(int typeOfKeys)
     :database(new SetDatabase<KeyClass,ValueClass>(typeOfKeys))

@@ -5,6 +5,11 @@
 #include<sys/unistd.h>
 #include<unistd.h>
 #include<strings.h>
+#include <cstring>	//for strcat
+using namespace std;
+
+#include <inttypes.h>
+#include <cstdint>	//handle this error: cast from ‘void*’ to ‘int’ loses precision, sbrk
 
 /*  CONVENTIONS */
 /* 								      */
@@ -34,8 +39,8 @@
 printf("Error: "); printf(a); \
 printf("Exiting from line %i in file %s\n",__LINE__,__FILE__); \
 printf("\nCausing Segmentation Fault to exit ungracefully\n"); \
-       int * junk = NULL; (*junk)++;\
-       printf("%i\n",(int)junk);}
+       int* junk = NULL; (*junk)++;\
+       printf("%i\n",*junk);}
 
 #endif /* ends #ifndef ExitProgramMacro */
 
@@ -100,11 +105,10 @@ inline void * SafeMalloc(size_t size) {
     char errorMessagePartOne [200];
     char errorMessagePartTwo [200];
     sprintf(errorMessagePartOne,
-	    "Exiting From SafeMalloc because malloc of size %i failed.\n",
-	    size);
-    sprintf(errorMessagePartTwo,
-	    "Calling sbrk(0) gives %x\n",(int)sbrk(0));
-    strcat(errorMessagePartOne,errorMessagePartTwo);
+	    "Exiting From SafeMalloc because malloc of size %i failed.\n", size);
+   // sprintf(errorMessagePartTwo,
+    //    "Calling sbrk(0) gives %x\n",(int)(sbrk(0)));
+    strcat(errorMessagePartOne, errorMessagePartTwo);
     ExitProgramMacro(errorMessagePartOne);
     return(0);
   }
@@ -133,7 +137,7 @@ inline void * SafeCalloc(int numberOfElements , size_t size) {
   } else {
     printf("memory overflow: calloc failed in SafeCalloc(%i,%i).",
 	   numberOfElements, size);
-    printf("sbrk(0) gives %x\n",(int)sbrk(0));
+    //printf("sbrk(0) gives %x\n",(int)(sbrk(0)));
     printf("  Exiting Program.\n");
     ExitProgramMacro("Exiting From Function SafeCalloc(...)\n");
     return(0);

@@ -1,7 +1,7 @@
 #include "interval_tree.h"
 #include <stdio.h>
 #include <math.h>
-
+using namespace std;
 // If the symbol CHECK_INTERVAL_TREE_ASSUMPTIONS is defined then the
 // code does a lot of extra checking to make sure certain assumptions
 // are satisfied.  This only needs to be done if you suspect bugs are
@@ -16,20 +16,20 @@ const int MIN_INT=-MAX_INT;
 #define ITMax(a, b) ( (a > b) ? a : b )
 
 IntervalTreeNode::IntervalTreeNode(){
-};
+}
 
 IntervalTreeNode::IntervalTreeNode(Interval * newInterval) 
   : storedInterval (newInterval) ,
     key(newInterval->GetLowPoint()), 
     high(newInterval->GetHighPoint()) , 
     maxHigh(high) {
-};
+}
 IntervalTreeNode::~IntervalTreeNode(){
-};
+}
 Interval::Interval(){
-};
+}
 Interval::~Interval(){
-};
+}
 void Interval::Print() const {
   cout << "No Print Method defined for instance of Interval" << endl;
 }

@@ -3,7 +3,8 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include "misc.h"
-#include <iostream.h>
+#include <iostream>
+#include <ostream>
 
 #ifndef DEFAULT_INITIAL_SIZE
 #define DEFAULT_INITIAL_SIZE 16
@@ -33,7 +34,16 @@
 
 template <class Type>
 class TemplateStack {
-  friend ostream & operator<<<Type>(ostream &,TemplateStack<Type> &) ;
+  friend ostream& operator<< (ostream& out, TemplateStack<Type>& instance) ;
+	// 2013.09.21 YH "<Type>" after "operator<<" is removed because this error:
+  /*
+   * interval_tree.cc:434:37:   instantiated from here
+TemplateStack.H:37:19: error: template-id ‘operator<< <IntervalTreeNode**>’ for ‘std::ostream& operator<<(std::ostream&, TemplateStack<IntervalTreeNode**>&)’ does not match any template declaration
+TemplateStack.H: In instantiation of ‘TemplateStack<void*>’:
+interval_tree.cc:714:48:   instantiated from here
+TemplateStack.H:37:19: error: template-id ‘operator<< <void**>’ for ‘std::ostream& operator<<(std::ostream&, TemplateStack<void**>&)’ does not match any template declaration
+   *
+   */
  public:
   TemplateStack(int size = DEFAULT_INITIAL_SIZE)
     : currentSize(0) ,
