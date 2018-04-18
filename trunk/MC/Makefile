@@ -12,6 +12,7 @@ $(latex_files):	%:	%.tex
 	-makeindex $@
 	-latex $@
 	-latex $@
+	-dvipdf $@.dvi
 
 clean:
 	-rm -f *.out *.log *.aux *.pdf *.ps *.dvi *.html *.fo *.rtf *.err *.xsl *.*~ *.toc *.bbl *.blg *.backup *.idx *.ilg *.ind
