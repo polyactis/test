@@ -18,3 +18,9 @@
 .vscode
 build
 dist
+**/Debug
+**/build
+**/Cargo.lock
+**/tags
+**/target
+**/Cargo.lock.old
